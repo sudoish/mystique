@@ -58,6 +58,7 @@ export interface Snapshot {
 	qf?: { total: number; items: string[] };
 	screen?: string;
 	synced?: boolean;
+	floats?: string[];
 }
 
 export class NvimSession {
@@ -158,13 +159,17 @@ export class NvimSession {
 		const deny =
 			process.env.PI_NVIM_KEYMAP_DENY ??
 			"\\c\\v(telescope|find|grep|theme|whichkey|cheatsheet|term|tmux|lazygit|git|<ai>|opencode|sidekick|claude|copilot|note|obsidian|strudel|dbui|<pr>|review|session|daily|template|scroll|navigate|quit|highlights|copy whole|line number|marks|edit suggestion|diff|add current buffer|peek|outline|float output|loclist)";
-		const km = await this.lua<{ leader: string; lines: string[] }>("return PiAgent.keymaps(...)", [deny, 70]);
+		const km = await this.lua<{ leader: string; lines: string[]; gotchas: string[] }>(
+			"return PiAgent.keymaps(...)",
+			[deny, 70],
+		);
 		this.leader = km.leader;
 		const leaderName = km.leader === " " ? "<Space>" : km.leader;
 		this.cheatsheet = [
 			`Leader is ${leaderName}. You can write <leader> in nvim_keys and it is expanded.`,
 			"lhs            mode description (n=normal o=operator-pending x=visual)",
 			...km.lines,
+			...(km.gotchas?.length ? ["", "GOTCHAS in this config:", ...km.gotchas.map((g) => `- ${g}`)] : []),
 		].join("\n");
 	}
 

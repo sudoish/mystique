@@ -65,6 +65,7 @@ function snapResult(s: Snapshot, opts: { extra?: string; notice?: string } = {})
 		out.push(c.text ? `changed ${c.file} ${ranges}:\n${c.text}` : `changed ${c.file} ${ranges}`);
 	}
 	if (s.qf) out.push(`quickfix (${s.qf.total}):\n${s.qf.items.join("\n")}`);
+	if (s.floats?.length) out.push(`floating windows:\n${s.floats.join("\n")}`);
 	out.push(details.status!);
 	out.push(s.ctx);
 	if (s.bufs && s.bufs.length > 1) out.push(`buffers: ${s.bufs.join(" ")}`);
@@ -387,6 +388,44 @@ const checkTool = defineTool({
 	},
 });
 
+const testsTool = defineTool({
+	name: "nvim_tests",
+	label: "nvim tests",
+	description:
+		"Read neotest results: waits for running tests to finish (start them first with the user's test mappings via nvim_keys, " +
+		"e.g. <leader>tt nearest, <leader>tf file, <leader>ts suite) and returns pass/fail counts and failure messages with locations.",
+	promptSnippet: "Wait for neotest runs and read pass/fail counts and failures",
+	parameters: Type.Object({
+		timeout: Type.Optional(Type.Number({ description: "Max seconds to wait for running tests (default 60)" })),
+	}),
+	executionMode: "sequential",
+	renderCall: (_args, theme) => new Text(title(theme, "🧪", "tests") + theme.fg("dim", "wait for neotest results"), 0, 0),
+	renderResult: (result, opts, theme) => {
+		if (opts.isPartial) return new Text(theme.fg("warning", "tests running…"), 0, 0);
+		const d = (result.details ?? {}) as NvimDetails & { failed?: number };
+		const full = (result.content[0] as { text?: string })?.text ?? "";
+		let text = theme.fg(d.failed ? "error" : "success", d.summary ?? full.split("\n")[0]);
+		if (d.failed || opts.expanded) {
+			for (const l of full.split("\n").slice(1, opts.expanded ? 60 : 8)) text += `\n${theme.fg("dim", l)}`;
+		}
+		return new Text(text, 0, 0);
+	},
+	async execute(_id, p, _signal, _onUpdate, ctx) {
+		const timeout = Math.max(5, p.timeout ?? 60);
+		return withNvim(ctx, "waiting for tests", false, async (notice) => {
+			const r = await session.lua<{
+				counts: { total: number; passed: number; failed: number; skipped: number; running: number };
+				failures: string[];
+				timed_out: boolean;
+			}>("return PiAgent.tests(...)", [timeout * 1000], (timeout + 15) * 1000);
+			const c = r.counts;
+			const summary = `${c.passed} passed, ${c.failed} failed, ${c.skipped} skipped (${c.total} total)${r.timed_out ? ", still running" : ""}`;
+			const body = [notice, summary, ...(r.failures.length ? ["failures:", ...r.failures] : [])].filter(Boolean);
+			return { content: [{ type: "text" as const, text: body.join("\n") }], details: { summary, failed: c.failed, notice } };
+		});
+	},
+});
+
 const screenTool = defineTool({
 	name: "nvim_screen",
 	label: "nvim screen",
@@ -434,7 +473,7 @@ function saveCheatsheet(text: string) {
 }
 
 export default function (pi: ExtensionAPI) {
-	for (const t of [keysTool, exTool, insertTool, viewTool, grepTool, lspTool, checkTool, screenTool]) {
+	for (const t of [keysTool, exTool, insertTool, viewTool, grepTool, lspTool, checkTool, testsTool, screenTool]) {
 		pi.registerTool(t as any);
 	}
 

@@ -200,7 +200,21 @@ function M.keymaps(deny, max)
     if i > (max or 70) then break end
     lines[#lines + 1] = ("%-14s %-3s %s"):format(o.lhs, o.modes, o.desc)
   end
-  return { leader = leader, lines = lines }
+  -- Gotchas: insert-mode maps that fire while typing text, and single-key normal maps that
+  -- override built-in commands.
+  local gotchas = {}
+  for _, m in ipairs(api.nvim_get_keymap("i")) do
+    if m.lhs:match("^[%w%p]+$") and #m.lhs >= 2 and not m.lhs:find("^<") then
+      gotchas[#gotchas + 1] = ("insert-mode `%s` → %s: never type `%s` inside text"):format(m.lhs, m.rhs or m.desc or "function", m.lhs)
+    end
+  end
+  for _, m in ipairs(api.nvim_get_keymap("n")) do
+    -- Only described maps: undescribed ones are usually which-key/repeat wrappers that keep the built-in behavior.
+    if #m.lhs == 1 and m.lhs:match("%p") and m.desc and m.desc ~= "" and not m.desc:find("^:help") then
+      gotchas[#gotchas + 1] = ("normal `%s` is remapped → %s (the built-in `%s` is unavailable)"):format(m.lhs, m.desc, m.lhs)
+    end
+  end
+  return { leader = leader, lines = lines, gotchas = gotchas }
 end
 
 ---------------------------------------------------------------------------
@@ -296,6 +310,8 @@ function M.snapshot(opts)
   end
   local qf = fn.getqflist({ size = 0, title = 0 })
   if qf.size > 0 and opts.qf then snap.qf = M.qflist(opts.qf) end
+  local floats = M.floats()
+  if #floats > 0 then snap.floats = floats end
   if #fn.getbufinfo({ buflisted = 1 }) > 1 then
     local bufs = {}
     for _, info in ipairs(fn.getbufinfo({ buflisted = 1 })) do
@@ -304,6 +320,76 @@ function M.snapshot(opts)
     snap.bufs = bufs
   end
   return snap
+end
+
+-- Text of visible floating windows (hover docs, test output, pickers), excluding our status badge.
+function M.floats(max_lines)
+  local out = {}
+  for _, win in ipairs(api.nvim_tabpage_list_wins(0)) do
+    local cfg = api.nvim_win_get_config(win)
+    if cfg.relative ~= "" and win ~= M.status_win and cfg.focusable ~= false then
+      local buf = api.nvim_win_get_buf(win)
+      local lines = api.nvim_buf_get_lines(buf, 0, max_lines or 15, false)
+      local text = vim.trim(table.concat(lines, "\n"):gsub("\27%[[%d;]*m", ""))
+      if text ~= "" then
+        local name = vim.bo[buf].filetype ~= "" and vim.bo[buf].filetype or "float"
+        out[#out + 1] = ("[%s]\n%s"):format(name, text)
+      end
+    end
+  end
+  return out
+end
+
+---------------------------------------------------------------------------
+-- Tests (neotest): wait for runs to finish, then report counts and failures
+---------------------------------------------------------------------------
+function M.tests(timeout_ms)
+  local ok, neotest = pcall(require, "neotest")
+  if not ok or not neotest.state then error("neotest is not loaded (it loads after an LSP attaches to a buffer)") end
+  local function counts()
+    local agg = { total = 0, passed = 0, failed = 0, skipped = 0, running = 0 }
+    for _, id in ipairs(neotest.state.adapter_ids() or {}) do
+      local c = neotest.state.status_counts(id) or {}
+      for k in pairs(agg) do agg[k] = agg[k] + (c[k] or 0) end
+    end
+    return agg
+  end
+  local start = vim.uv.now()
+  local seen_running = counts().running > 0
+  -- Runs start asynchronously: give a just-triggered run time to register, then wait for it.
+  vim.wait(timeout_ms or 60000, function()
+    local c = counts()
+    if c.running > 0 then seen_running = true end
+    if seen_running then return c.running == 0 end
+    return vim.uv.now() - start > 3000
+  end, 100)
+  vim.wait(300) -- let diagnostics from results land
+  local c = counts()
+  local failures = {}
+  for name, id in pairs(api.nvim_get_namespaces()) do
+    if name:find("neotest") then
+      for _, d in ipairs(vim.diagnostic.get(nil, { namespace = id })) do
+        if #failures < 20 then
+          local msg = (d.message or ""):gsub("\27%[[%d;]*m", "")
+          msg = vim.trim(msg):gsub("\n%s*\n", "\n")
+          -- Keep the assertion and the first stack frame; drop framework frames.
+          local kept, frames = {}, 0
+          for line in msg:gmatch("[^\n]+") do
+            if line:match("^%s*at ") then
+              frames = frames + 1
+              if frames == 1 and not line:find("node_modules") then kept[#kept + 1] = line end
+            else
+              kept[#kept + 1] = line
+            end
+          end
+          msg = table.concat(kept, "\n")
+          if #msg > 600 then msg = msg:sub(1, 600) .. "…" end
+          failures[#failures + 1] = ("%s:%d %s"):format(rel(api.nvim_buf_get_name(d.bufnr)), d.lnum + 1, msg)
+        end
+      end
+    end
+  end
+  return { counts = c, failures = failures, timed_out = c.running > 0 }
 end
 
 ---------------------------------------------------------------------------

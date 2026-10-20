@@ -1,0 +1,12 @@
+{
+  "name": "pi-nvim-demo-tests",
+  "private": true,
+  "scripts": { "test": "jest", "typecheck": "tsc --noEmit" },
+  "devDependencies": {
+    "@types/jest": "^29.5.12",
+    "jest": "^29.7.0",
+    "ts-jest": "^29.2.5",
+    "typescript": "^5.6.0",
+    "typescript-language-server": "^4.3.0"
+  }
+}
