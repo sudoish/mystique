@@ -9,8 +9,10 @@ M.chan = M.chan or nil -- RPC channel of the pi client (for done notifications)
 M.changes = M.changes or {} -- bufnr -> list of {first, last} (1-based, inclusive)
 M.attached = M.attached or {}
 M.diag_tick = M.diag_tick or 0
-M.pending_cmd = nil
 M.last_ex = nil
+M.busy = false -- true while a pi tool is running
+M.user_changes = M.user_changes or {} -- edits made by the human between tool calls
+M.last_state = M.last_state or nil -- {buf, cursor, mode} when the last tool finished
 
 local api, fn = vim.api, vim.fn
 
@@ -33,15 +35,21 @@ end
 ---------------------------------------------------------------------------
 -- Change tracking
 ---------------------------------------------------------------------------
+function M.on_lines(b, first, last_new)
+  local store = M.busy and M.changes or M.user_changes
+  local list = store[b] or {}
+  store[b] = list
+  list[#list + 1] = { first + 1, math.max(first + 1, last_new) }
+end
+
 local function track(buf)
   if M.attached[buf] or not api.nvim_buf_is_loaded(buf) then return end
   if vim.bo[buf].buftype ~= "" then return end
   M.attached[buf] = true
   api.nvim_buf_attach(buf, false, {
+    -- Dispatch through _G so a reloaded module takes over existing attachments.
     on_lines = function(_, b, _, first, _, last_new)
-      local list = M.changes[b] or {}
-      M.changes[b] = list
-      list[#list + 1] = { first + 1, math.max(first + 1, last_new) }
+      _G.PiAgent.on_lines(b, first, last_new)
     end,
     on_detach = function(_, b)
       M.attached[b] = nil
@@ -85,9 +93,10 @@ local function numbered(buf, a, b, cur)
   return table.concat(out, "\n")
 end
 
-local function take_changes(max_lines)
+local function take_changes(max_lines, store)
+  store = store or M.changes
   local result, budget = {}, max_lines or 30
-  for buf, ranges in pairs(M.changes) do
+  for buf, ranges in pairs(store) do
     if api.nvim_buf_is_valid(buf) and #ranges > 0 then
       local merged = merge(ranges, math.max(1, api.nvim_buf_line_count(buf)))
       local entry = { file = rel(api.nvim_buf_get_name(buf)), ranges = merged }
@@ -102,8 +111,96 @@ local function take_changes(max_lines)
       result[#result + 1] = entry
     end
   end
-  M.changes = {}
+  for k in pairs(store) do store[k] = nil end
   return result
+end
+
+---------------------------------------------------------------------------
+-- Tool lifecycle + human activity detection
+---------------------------------------------------------------------------
+local function current_state()
+  local c = api.nvim_win_get_cursor(0)
+  return { buf = api.nvim_get_current_buf(), line = c[1], col = c[2], mode = api.nvim_get_mode().mode }
+end
+
+-- Called when a pi tool starts. Returns what the human did since the last tool finished, or nil.
+function M.start_tool(label)
+  local activity = nil
+  local now = current_state()
+  local last = M.last_state
+  if last then
+    local notes = {}
+    if now.buf ~= last.buf then
+      notes[#notes + 1] = "switched to " .. rel(api.nvim_buf_get_name(now.buf))
+    elseif now.line ~= last.line or now.col ~= last.col then
+      notes[#notes + 1] = ("moved cursor to %d:%d"):format(now.line, now.col + 1)
+    end
+    if now.mode ~= last.mode then notes[#notes + 1] = "mode is now " .. now.mode end
+    local edits = take_changes(15, M.user_changes)
+    if #edits > 0 then
+      for _, e in ipairs(edits) do
+        local r = {}
+        for _, x in ipairs(e.ranges) do r[#r + 1] = x[1] == x[2] and tostring(x[1]) or (x[1] .. "-" .. x[2]) end
+        notes[#notes + 1] = ("edited %s %s"):format(e.file, table.concat(r, ",")) .. (e.text and (":\n" .. e.text) or "")
+      end
+    end
+    if #notes > 0 then activity = table.concat(notes, "\n") end
+  else
+    for k in pairs(M.user_changes) do M.user_changes[k] = nil end
+  end
+  M.busy = true
+  M.status(label)
+  return activity
+end
+
+function M.end_tool()
+  M.status(nil)
+  M.busy = false
+  M.last_state = current_state()
+end
+
+---------------------------------------------------------------------------
+-- Keymap cheat sheet (the user's own mappings, filtered to editing-relevant ones)
+---------------------------------------------------------------------------
+function M.keymaps(deny, max)
+  local leader = vim.g.mapleader or "\\"
+  local seen, out = {}, {}
+  local deny_re = vim.regex(deny)
+  for _, mode in ipairs({ "n", "o", "x" }) do
+    for _, m in ipairs(api.nvim_get_keymap(mode)) do
+      local desc = m.desc
+      if desc and desc ~= "" and not m.lhs:find("Plug", 1, true) and not desc:find("^:")
+        and not deny_re:match_str(desc) and not m.lhs:find("Mouse") then
+        local lhs = m.lhs
+        if lhs:sub(1, #leader) == leader then lhs = "<leader>" .. lhs:sub(#leader + 1) end
+        lhs = lhs:gsub(" ", "<Space>")
+        local key = lhs .. "\0" .. desc
+        if not seen[key] then
+          seen[key] = mode
+          out[#out + 1] = { lhs = lhs, desc = desc:sub(1, 45), modes = mode }
+        else
+          for _, o in ipairs(out) do
+            if o.lhs == lhs and o.desc == desc:sub(1, 45) and not o.modes:find(mode) then o.modes = o.modes .. mode end
+          end
+        end
+      end
+    end
+  end
+  local function rank(o)
+    if o.modes:find("o") then return 0 end
+    if o.lhs:find("^<leader>") then return 1 end
+    return 2
+  end
+  table.sort(out, function(a, b)
+    if rank(a) ~= rank(b) then return rank(a) < rank(b) end
+    return a.lhs < b.lhs
+  end)
+  local lines = {}
+  for i, o in ipairs(out) do
+    if i > (max or 70) then break end
+    lines[#lines + 1] = ("%-14s %-3s %s"):format(o.lhs, o.modes, o.desc)
+  end
+  return { leader = leader, lines = lines }
 end
 
 ---------------------------------------------------------------------------

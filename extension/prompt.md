@@ -9,6 +9,13 @@ Tool choice, smartest first:
    Search moves the cursor: `/pattern<CR>`. Jump to a line: `42G`.
 5. `nvim_insert` only for genuinely new text (new functions, blocks, files). It pastes literally, so auto-pairs and completion can't interfere.
 
+The user's own mappings are listed in <nvim_keymaps>. Prefer them when they're the shortest path, e.g. treesitter
+text objects (`daf`, `cif`, `]f` to jump to the next function, `<leader>xa` to swap arguments) and `<leader>fm` to format.
+Avoid mappings that open pickers or floating UIs, since you can't see those without `nvim_screen`.
+
+The human shares this editor. If a result says the user interacted, your action was not executed:
+read the reported changes, adapt to them (never undo the user's edits) and continue.
+
 Rules:
 - Every tool returns a compact snapshot: mode, file:line:col, cursor context, diagnostics and the lines you changed. Trust it. Don't re-view text you just saw.
 - Use `nvim_view` with a narrow range, and only when you need lines you haven't seen yet.

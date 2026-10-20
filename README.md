@@ -19,6 +19,7 @@ On the first `nvim_*` tool call (or `/nvim`), the extension splits the current h
 | Command | Effect |
 |---|---|
 | `/nvim` | Open or attach to the agent's Neovim pane |
+| `/nvim-keymaps` | Show the cheat sheet of your mappings given to the agent |
 | `/nvim-speed demo\|fast` | Paced, watchable typing (default) or instant |
 | `/nvim-close` | Quit Neovim and close its pane |
 
@@ -28,6 +29,22 @@ On the first `nvim_*` tool call (or `/nvim`), the extension splits the current h
 | `PI_NVIM_SPEED=fast` | Start in fast mode |
 | `PI_NVIM_POLICY=off` | Keep the built-in read/edit/write tools and don't guard bash |
 | `PI_NVIM_CLOSE=1` | Close the Neovim pane when the pi session ends |
+| `PI_NVIM_AUTOSTART=0` | Don't open Neovim automatically when the interactive TUI starts |
+| `PI_NVIM_KEYMAP_DENY=<vim regex>` | Override which mapping descriptions are left out of the cheat sheet |
+
+### Shared editor
+
+The editor is shared with you. Edits, cursor moves, buffer switches and mode changes you make between the agent's
+tool calls are detected. Cursor-sensitive tools (`nvim_keys`, `nvim_ex`, `nvim_insert`, cursor-based `nvim_lsp`)
+then do **not** run. The agent gets a report of what you did (including your edited lines) and re-plans.
+Other tools run and include the report.
+
+### Your mappings
+
+On connect, the extension reads your normal, operator-pending and visual mappings that have descriptions. It
+filters out pickers, AI, git and terminal UIs, and gives the agent a compact cheat sheet (treesitter text objects
+and motions first, then leader maps). It's cached in `~/.cache/pi-nvim-dev/keymaps.txt`, and `<leader>` in
+`nvim_keys` is expanded to your leader key.
 
 ### Tools
 
@@ -47,3 +64,7 @@ pi -e ../extension/index.ts "Rename calc to cartTotal everywhere, fix all type e
 
 First recorded run: 11 tool calls, about 47k input tokens, $0.04. The agent used LSP rename, multi-command `:s`
 chains, `nvim_insert` for new code, and `nvim_check` (ts_ls: 0 errors), then confirmed with `tsc --noEmit`.
+
+Interactive run (pi TUI and Neovim side by side in a herdr tab, with a human typing mid-task): the guard blocked
+the agent's action after a human edit. The agent read the human's comment ("keep cart.ts pure"), put its code in
+`main.ts` instead, and left the human's edit alone.

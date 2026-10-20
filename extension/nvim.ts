@@ -146,7 +146,42 @@ export class NvimSession {
 		await client.lua(readFileSync(this.luaPath, "utf8"));
 		await client.lua("PiAgent.begin(...)", [this.chan]);
 		this.client = client;
+		await this.loadKeymaps().catch(() => {});
 		return client;
+	}
+
+	/** The user's leader key and an editing-relevant cheat sheet of their mappings. */
+	leader = " ";
+	cheatsheet: string | undefined;
+
+	private async loadKeymaps(): Promise<void> {
+		const deny =
+			process.env.PI_NVIM_KEYMAP_DENY ??
+			"\\c\\v(telescope|find|grep|theme|whichkey|cheatsheet|term|tmux|lazygit|git|<ai>|opencode|sidekick|claude|copilot|note|obsidian|strudel|dbui|<pr>|review|session|daily|template|scroll|navigate|quit|highlights|copy whole|line number|marks|edit suggestion|diff|add current buffer|peek|outline|float output|loclist)";
+		const km = await this.lua<{ leader: string; lines: string[] }>("return PiAgent.keymaps(...)", [deny, 70]);
+		this.leader = km.leader;
+		const leaderName = km.leader === " " ? "<Space>" : km.leader;
+		this.cheatsheet = [
+			`Leader is ${leaderName}. You can write <leader> in nvim_keys and it is expanded.`,
+			"lhs            mode description (n=normal o=operator-pending x=visual)",
+			...km.lines,
+		].join("\n");
+	}
+
+	/** Expand <leader>/<Leader> into the configured leader key. */
+	expandLeader(keys: string): string {
+		const leader = this.leader === " " ? "<Space>" : this.leader === "<" ? "<lt>" : this.leader;
+		return keys.replace(/<leader>/gi, leader);
+	}
+
+	/** Mark a tool as running. Returns a description of human activity since the last tool, if any. */
+	async startTool(label: string): Promise<string | undefined> {
+		const activity = await this.lua<string | null>("return PiAgent.start_tool(...)", [label]);
+		return typeof activity === "string" && activity ? activity : undefined;
+	}
+
+	async endTool(): Promise<void> {
+		await this.lua("PiAgent.end_tool()").catch(() => {});
 	}
 
 	/** Type keys into nvim like a human (paced in demo mode). */
@@ -247,9 +282,7 @@ export class NvimSession {
 		return snap;
 	}
 
-	async status(text: string | undefined): Promise<void> {
-		await this.lua("PiAgent.status(...)", [text ?? ""]).catch(() => {});
-	}
+
 
 	/** Read what is visibly rendered in the nvim pane (for floating UIs and prompts). */
 	async screen(lines = 60): Promise<string> {
@@ -273,7 +306,11 @@ export class NvimSession {
 
 	async saveAll(): Promise<void> {
 		if (!this.client) return;
-		await Promise.race([this.lua("pcall(vim.cmd, 'silent! wall')"), sleep(2000)]).catch(() => {});
+		// Mark busy so format-on-save edits aren't mistaken for the human's.
+		await Promise.race([
+			this.lua("PiAgent.busy = true; pcall(vim.cmd, 'silent! wall'); PiAgent.busy = false"),
+			sleep(2000),
+		]).catch(() => {});
 	}
 
 	async disconnect(closePane: boolean): Promise<void> {

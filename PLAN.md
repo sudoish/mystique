@@ -121,6 +121,18 @@ Plus a ~40-line cheat sheet of the user's own mappings (harpoon, oil, lspsaga, â
    Use `:wincmd` in tools.
 6. **Blocking prompts** (swap files, `Press ENTER`, confirms) must be detected and resolved, never left hanging.
 
+## Status
+
+- [x] Visible proof of concept: herdr split, RPC, `nvim_keys` + snapshots
+- [x] `nvim_ex`, `nvim_insert`, `nvim_view`, policy (built-in file tools off, bash guard, auto `:wall`)
+- [x] `nvim_grep`, `nvim_lsp`, `nvim_check`
+- [x] Prompt playbook, keymap cheat sheet, custom TUI renderers, pacing modes
+- [x] Human activity detection + guard (shared editor)
+- [x] Watchdog for blocking prompts
+- [ ] Evaluation suite (5-10 tasks; tokens/keystrokes vs plain pi)
+- [ ] Run tests inside nvim (neotest / `:terminal`) and read results
+- [ ] Close stale quickfix windows / tidy layout between tasks
+
 ## Build order
 
 1. **Visible proof of concept:** spawn the split, attach RPC, `nvim_keys` + snapshot.
