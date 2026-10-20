@@ -1,0 +1,19 @@
+.gitignore
+  s_d76698e1b3e045::t_007687e650080e 1-3
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.7.5",
+  "base_commit_sha": "3a3a6c3d671085ce0c30dfb04e7320aff002869c",
+  "prompts": {},
+  "sessions": {
+    "s_d76698e1b3e045": {
+      "agent_id": {
+        "tool": "pi",
+        "id": "01a156c2-9c24-70a3-899e-7b14f358e061",
+        "model": "claude-opus-5-5"
+      },
+      "human_author": "Thiago Pacheco <hi@sudoish.com>"
+    }
+  }
+}
