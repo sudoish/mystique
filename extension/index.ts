@@ -1,5 +1,7 @@
 /**
- * pi-nvim-dev — drive a live, visible Neovim (in a herdr pane) as the only way to edit code.
+ * pi-nvim-dev — drive a live, visible Neovim as the only way to edit code.
+ * The Neovim is either the one pi runs inside (a :terminal split, e.g. sidekick.nvim),
+ * one the user points us at (PI_NVIM_SOCKET), or one we spawn in a herdr pane.
  */
 import { mkdirSync, readFileSync, writeFileSync } from "node:fs";
 import { homedir } from "node:os";
@@ -8,14 +10,17 @@ import { fileURLToPath } from "node:url";
 import { StringEnum, Type } from "@earendil-works/pi-ai";
 import { defineTool, type ExtensionAPI, type ExtensionContext } from "@earendil-works/pi-coding-agent";
 import { Text } from "@earendil-works/pi-tui";
-import { NvimSession, shellQuote, type Snapshot } from "./nvim.ts";
+import { detectMode, NvimSession, shellQuote, type Snapshot } from "./nvim.ts";
 
 const here = dirname(fileURLToPath(import.meta.url));
 const session = new NvimSession(join(here, "lua", "pi_agent.lua"));
 const playbook = readFileSync(join(here, "prompt.md"), "utf8");
 const cacheFile = join(homedir(), ".cache", "pi-nvim-dev", "keymaps.txt");
 
-const policyEnabled = process.env.PI_NVIM_POLICY !== "off";
+// Without a reachable Neovim (not inside one, not in herdr, no PI_NVIM_SOCKET) the extension stays
+// inert: builtin tools and bash keep working, so a globally installed copy never cripples plain pi.
+const active = detectMode() !== undefined;
+const policyEnabled = active && process.env.PI_NVIM_POLICY !== "off";
 const DISABLED_BUILTINS = ["read", "edit", "write", "grep", "find", "ls"];
 
 // ---------------------------------------------------------------------------
@@ -417,10 +422,20 @@ const testsTool = defineTool({
 				counts: { total: number; passed: number; failed: number; skipped: number; running: number };
 				failures: string[];
 				timed_out: boolean;
+				unsaved?: string[];
+				output?: string;
 			}>("return PiAgent.tests(...)", [timeout * 1000], (timeout + 15) * 1000);
 			const c = r.counts;
 			const summary = `${c.passed} passed, ${c.failed} failed, ${c.skipped} skipped (${c.total} total)${r.timed_out ? ", still running" : ""}`;
-			const body = [notice, summary, ...(r.failures.length ? ["failures:", ...r.failures] : [])].filter(Boolean);
+			const body = [
+				notice,
+				summary,
+				r.unsaved?.length
+					? `WARNING: unsaved buffers (${r.unsaved.join(", ")}): tests ran against the files on disk. Run \`wa\` and re-run.`
+					: "",
+				...(r.failures.length ? ["failures:", ...r.failures] : []),
+				r.output ? `runner output (tail):\n${r.output}` : "",
+			].filter(Boolean);
 			return { content: [{ type: "text" as const, text: body.join("\n") }], details: { summary, failed: c.failed, notice } };
 		});
 	},
@@ -430,7 +445,7 @@ const screenTool = defineTool({
 	name: "nvim_screen",
 	label: "nvim screen",
 	description:
-		"Read the visible Neovim screen from the herdr pane. Only use it for floating UIs or prompts that snapshots can't describe.",
+		"Read the visible Neovim screen as text. Only use it for floating UIs or prompts that snapshots can't describe.",
 	parameters: Type.Object({}),
 	executionMode: "sequential",
 	renderCall: (_args, theme) => new Text(title(theme, "▢", "screen"), 0, 0),
@@ -483,19 +498,21 @@ export default function (pi: ExtensionAPI) {
 	}
 
 	pi.on("session_start", async (_event, ctx) => {
+		if (!active && ctx.mode === "tui") {
+			ctx.ui.notify("nvim-dev: no Neovim detected (run pi inside Neovim, herdr, or set PI_NVIM_SOCKET); inactive", "warning");
+		}
 		if (policyEnabled) {
 			pi.setActiveTools(pi.getActiveTools().filter((t) => !DISABLED_BUILTINS.includes(t)));
 		}
-		// In the interactive TUI, open the editor pane right away so both are visible side by side.
-		if (ctx.mode === "tui" && process.env.HERDR_ENV === "1" && process.env.PI_NVIM_AUTOSTART !== "0") {
+		// In the interactive TUI, connect right away so the editor is visible next to (or around) pi.
+		if (ctx.mode === "tui" && active && process.env.PI_NVIM_AUTOSTART !== "0") {
 			start(ctx).catch((e) => ctx.ui.notify(`nvim: ${(e as Error).message}`, "error"));
 		}
 	});
 
 	pi.on("before_agent_start", async (event, ctx) => {
-		if (!session.connected && process.env.HERDR_ENV === "1") {
-			await start(ctx).catch(() => {});
-		}
+		if (!active) return;
+		if (!session.connected) await start(ctx).catch(() => {});
 		event.systemPromptOptions.sections.nvim_playbook = playbook;
 		const sheet = session.cheatsheet ?? loadCachedCheatsheet();
 		if (sheet) event.systemPromptOptions.sections.nvim_keymaps = sheet;
@@ -517,16 +534,21 @@ export default function (pi: ExtensionAPI) {
 		if (session.connected) await session.saveAll();
 	});
 
+	// When pi lives inside the editor, the run took the cursor away from the pi terminal; give it back.
+	pi.on("agent_end", async () => {
+		await session.endRun();
+	});
+
 	pi.on("session_shutdown", async () => {
 		await session.disconnect(process.env.PI_NVIM_CLOSE === "1");
 	});
 
 	pi.registerCommand("nvim", {
-		description: "Open (or attach to) the agent's Neovim pane",
+		description: "Connect to Neovim: the host editor, PI_NVIM_SOCKET, or a new herdr pane",
 		handler: async (_args, ctx) => {
 			try {
 				await start(ctx);
-				ctx.ui.notify(`nvim ready (${session.paneId ?? session.socket})`, "info");
+				ctx.ui.notify(`nvim ready: ${session.describe()}`, "info");
 			} catch (e) {
 				ctx.ui.notify(String((e as Error).message), "error");
 			}
@@ -550,10 +572,11 @@ export default function (pi: ExtensionAPI) {
 	});
 
 	pi.registerCommand("nvim-close", {
-		description: "Quit the agent's Neovim and close its pane",
+		description: "Close the agent's Neovim pane, or detach from the host editor",
 		handler: async (_args, ctx) => {
+			const owned = session.ownsPane;
 			await session.disconnect(true);
-			ctx.ui.notify("nvim closed", "info");
+			ctx.ui.notify(owned ? "nvim closed" : "detached from nvim (editor left open)", "info");
 		},
 	});
 }

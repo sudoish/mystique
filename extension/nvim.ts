@@ -5,6 +5,24 @@ import { attach, type NeovimClient } from "neovim";
 
 export type Speed = "demo" | "fast";
 
+/**
+ * Where the Neovim we drive comes from:
+ * - embedded: pi runs inside a `:terminal` of the user's Neovim (e.g. sidekick.nvim); `$NVIM` is its socket
+ * - external: `PI_NVIM_SOCKET` points at an `nvim --listen` the user started
+ * - herdr: we split a herdr pane and spawn our own instance
+ */
+export type Mode = "embedded" | "external" | "herdr";
+
+/** Which mode a connection would use from this process, or undefined when there is no Neovim to drive. */
+export function detectMode(): Mode | undefined {
+	const sock = process.env.PI_NVIM_SOCKET;
+	if (sock && existsSync(sock)) return "external";
+	const host = process.env.NVIM;
+	if (host && existsSync(host)) return "embedded";
+	if (process.env.HERDR_ENV === "1") return "herdr";
+	return undefined;
+}
+
 // The neovim client defaults to a winston logger that monkey-patches `console`.
 // Pass a silent logger so pi's own output stays intact.
 const silentLogger = {
@@ -64,6 +82,7 @@ export interface Snapshot {
 export class NvimSession {
 	client: NeovimClient | undefined;
 	socket: string | undefined;
+	mode: Mode | undefined;
 	paneId: string | undefined;
 	ownsPane = false;
 	speed: Speed = (process.env.PI_NVIM_SPEED as Speed) === "fast" ? "fast" : "demo";
@@ -92,14 +111,26 @@ export class NvimSession {
 		return this.connecting;
 	}
 
+	/** Short human-readable description of the connection, for notifications. */
+	describe(): string {
+		if (this.mode === "herdr") return `herdr pane ${this.paneId}`;
+		if (this.mode === "embedded") return `inside the host Neovim (${this.socket})`;
+		return `attached to ${this.socket}`;
+	}
+
 	private async start(cwd: string): Promise<NeovimClient> {
-		let socket = process.env.PI_NVIM_SOCKET;
-		if (!socket || !existsSync(socket)) {
-			if (process.env.HERDR_ENV !== "1") {
-				throw new Error(
-					"Not running inside herdr. Start pi inside herdr, or run `nvim --listen <sock>` yourself and set PI_NVIM_SOCKET=<sock>.",
-				);
-			}
+		const mode = detectMode();
+		if (!mode) {
+			throw new Error(
+				"No Neovim to drive. Run pi inside a Neovim terminal (e.g. sidekick.nvim), inside herdr, " +
+					"or start `nvim --listen <sock>` yourself and set PI_NVIM_SOCKET=<sock>.",
+			);
+		}
+		this.mode = mode;
+		let socket: string;
+		if (mode === "external") socket = process.env.PI_NVIM_SOCKET!;
+		else if (mode === "embedded") socket = process.env.NVIM!;
+		else {
 			socket = `/tmp/pi-nvim-${process.pid}-${Date.now().toString(36)}.sock`;
 			const split = JSON.parse(
 				await run("herdr", ["pane", "split", "--current", "--direction", "right", "--cwd", cwd, "--no-focus"]),
@@ -145,8 +176,10 @@ export class NvimSession {
 		}
 		this.chan = await client.channelId;
 		await client.lua(readFileSync(this.luaPath, "utf8"));
+		await client.lua("PiAgent.setup(...)", [{ embedded: mode === "embedded" }]);
 		await client.lua("PiAgent.begin(...)", [this.chan]);
 		this.client = client;
+		await this.dismissPrompts();
 		await this.loadKeymaps().catch(() => {});
 		return client;
 	}
@@ -179,8 +212,19 @@ export class NvimSession {
 		return keys.replace(/<leader>/gi, leader);
 	}
 
+	/** Dismiss hit-enter / more prompts (e.g. wrapped startup messages) so they can't stall the agent. */
+	async dismissPrompts(): Promise<void> {
+		for (let i = 0; i < 3; i++) {
+			const mode = (await this.client!.mode) as { mode: string; blocking: boolean };
+			if (!mode.mode.startsWith("r")) return;
+			await this.client!.input("<CR>");
+			await sleep(100);
+		}
+	}
+
 	/** Mark a tool as running. Returns a description of human activity since the last tool, if any. */
 	async startTool(label: string): Promise<string | undefined> {
+		await this.dismissPrompts();
 		const activity = await this.lua<string | null>("return PiAgent.start_tool(...)", [label]);
 		return typeof activity === "string" && activity ? activity : undefined;
 	}
@@ -248,9 +292,15 @@ export class NvimSession {
 		});
 	}
 
+	/** The agent loop ended: give focus back to the terminal it was taken from (embedded mode). */
+	async endRun(): Promise<boolean> {
+		if (!this.client || process.env.PI_NVIM_REFOCUS === "0") return false;
+		return this.lua<boolean>("return PiAgent.end_run()", [], 3000).catch(() => false);
+	}
+
 	/**
 	 * Run Lua in nvim with a watchdog. If nvim stops answering (e.g. a prompt inside a request),
-	 * press <Esc>/<CR> through the terminal (herdr), which bypasses the blocked RPC queue.
+	 * press <CR>/<Esc> through a path that bypasses the blocked RPC queue.
 	 */
 	async lua<T = any>(code: string, args: unknown[] = [], timeoutMs = 20000): Promise<T> {
 		const call = this.client!.lua(code, args as any) as Promise<T>;
@@ -274,7 +324,13 @@ export class NvimSession {
 	}
 
 	private async unblock(): Promise<void> {
-		if (!this.paneId) return;
+		// nvim_input is a "fast" API call: nvim handles it even while another request sits in a prompt.
+		for (const key of ["<CR>", "<Esc>"]) {
+			await Promise.race([this.client?.input(key), sleep(500)]).catch(() => {});
+			await sleep(200);
+		}
+		if (!this.ownsPane || !this.paneId) return;
+		// Belt and braces for our own herdr pane: real terminal keystrokes.
 		await run("herdr", ["pane", "send-keys", this.paneId, "enter"]).catch(() => {});
 		await sleep(200);
 		await run("herdr", ["pane", "send-keys", this.paneId, "esc"]).catch(() => {});
@@ -289,9 +345,15 @@ export class NvimSession {
 
 
 
-	/** Read what is visibly rendered in the nvim pane (for floating UIs and prompts). */
+	/**
+	 * Read what is visibly rendered in Neovim (for floating UIs and prompts). Our own herdr pane is read
+	 * through herdr (works even while nvim is blocked); otherwise nvim renders its screen to text for us.
+	 */
 	async screen(lines = 60): Promise<string> {
-		if (!this.paneId) throw new Error("nvim pane is not managed by herdr in this session");
+		if (!this.ownsPane || !this.paneId) {
+			const text = await this.lua<string>("return PiAgent.screen()", [], 10000);
+			return text.split("\n").slice(-lines).join("\n");
+		}
 		const out = await run("herdr", [
 			"pane",
 			"read",
@@ -318,12 +380,20 @@ export class NvimSession {
 		]).catch(() => {});
 	}
 
+	/**
+	 * Detach from Neovim. Only an instance we spawned ourselves is ever quit (`closePane`);
+	 * the user's own editor (embedded/external) is cleaned up and left open.
+	 */
 	async disconnect(closePane: boolean): Promise<void> {
 		const client = this.client;
 		this.client = undefined;
 		if (client) {
-			// `qa!` never answers (nvim exits), so fire it without waiting for a reply.
-			if (closePane) await Promise.race([client.command("qa!").catch(() => {}), sleep(300)]);
+			if (closePane && this.ownsPane) {
+				// `qa!` never answers (nvim exits), so fire it without waiting for a reply.
+				await Promise.race([client.command("qa!").catch(() => {}), sleep(300)]);
+			} else {
+				await Promise.race([client.lua("PiAgent.detach()").catch(() => {}), sleep(1000)]);
+			}
 			// Note: client.quit() sends `:qa!`. close() only detaches, leaving the editor open.
 			await Promise.race([client.close().catch(() => {}), sleep(500)]);
 		}

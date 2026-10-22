@@ -13,8 +13,17 @@ M.last_ex = nil
 M.busy = false -- true while a pi tool is running
 M.user_changes = M.user_changes or {} -- edits made by the human between tool calls
 M.last_state = M.last_state or nil -- {buf, cursor, mode} when the last tool finished
+M.gen = (M.gen or 0) + 1 -- bumped on (re)load and detach: stale buffer listeners drop out
+M.attached = {}
 
 local api, fn = vim.api, vim.fn
+
+-- Options we change in the host editor; restored by M.detach() (matters when pi runs inside the
+-- user's own Neovim session rather than a dedicated instance).
+M.saved_opts = M.saved_opts or {
+  shortmess = vim.o.shortmess, more = vim.o.more, confirm = vim.o.confirm,
+  grepprg = vim.o.grepprg, grepformat = vim.o.grepformat,
+}
 
 -- Avoid prompts that would block the agent.
 vim.opt.shortmess:append("A") -- no swap-file ATTENTION prompt
@@ -46,9 +55,11 @@ local function track(buf)
   if M.attached[buf] or not api.nvim_buf_is_loaded(buf) then return end
   if vim.bo[buf].buftype ~= "" then return end
   M.attached[buf] = true
+  local gen = M.gen
   api.nvim_buf_attach(buf, false, {
-    -- Dispatch through _G so a reloaded module takes over existing attachments.
+    -- Dispatch through _G so a reloaded module takes over; a stale generation detaches (return true).
     on_lines = function(_, b, _, first, _, last_new)
+      if _G.PiAgent.gen ~= gen then return true end
       _G.PiAgent.on_lines(b, first, last_new)
     end,
     on_detach = function(_, b)
@@ -116,6 +127,107 @@ local function take_changes(max_lines, store)
 end
 
 ---------------------------------------------------------------------------
+-- Windows: the agent only ever acts in an editor window, never in a terminal
+-- (e.g. the sidekick split that runs pi itself when pi is embedded in this Neovim).
+---------------------------------------------------------------------------
+M.embedded = M.embedded or false -- pi runs in a :terminal of this very Neovim
+M.agent_win = M.agent_win or nil -- the window the agent edits in
+M.return_win = M.return_win or nil -- the terminal the human was in when a run took focus
+
+local function is_float(win)
+  return api.nvim_win_get_config(win).relative ~= ""
+end
+
+local function is_term_win(win)
+  return api.nvim_win_is_valid(win) and vim.bo[api.nvim_win_get_buf(win)].buftype == "terminal"
+end
+
+-- A window the agent may edit in: a normal file buffer, not floating, in the current tabpage.
+local function editable(win)
+  if not win or not api.nvim_win_is_valid(win) or is_float(win) then return false end
+  if api.nvim_win_get_tabpage(win) ~= api.nvim_get_current_tabpage() then return false end
+  return vim.bo[api.nvim_win_get_buf(win)].buftype == ""
+end
+
+function M.editor_win()
+  if editable(M.agent_win) then return M.agent_win end
+  local prev = fn.win_getid(fn.winnr("#"))
+  if prev ~= 0 and editable(prev) then return prev end
+  local best, area = nil, -1
+  for _, win in ipairs(api.nvim_tabpage_list_wins(0)) do
+    if editable(win) then
+      local a = api.nvim_win_get_width(win) * api.nvim_win_get_height(win)
+      if a > area then best, area = win, a end
+    end
+  end
+  if best then return best end
+  vim.cmd("topleft vnew")
+  return api.nvim_get_current_win()
+end
+
+-- Move focus into the editor window when the human left it in a terminal.
+-- Returns true when focus was taken from a terminal (it is given back by M.end_run()).
+function M.focus_editor()
+  local cur = api.nvim_get_current_win()
+  local took = false
+  if is_term_win(cur) then
+    M.return_win = cur
+    took = true
+    api.nvim_set_current_win(M.editor_win())
+  end
+  M.agent_win = api.nvim_get_current_win()
+  return took
+end
+
+-- After the agent loop: hand focus back to the terminal it was taken from, unless the human
+-- moved elsewhere in the meantime.
+function M.end_run()
+  local back = M.return_win
+  M.return_win = nil
+  if not back or not is_term_win(back) then return false end
+  if api.nvim_get_current_win() ~= M.agent_win then return false end
+  api.nvim_set_current_win(back)
+  -- sidekick re-enters terminal mode on WinEnter by itself; a plain :terminal needs a nudge.
+  if vim.w[back].sidekick_cli == nil then vim.cmd("startinsert") end
+  return true
+end
+
+-- While a tool runs, keystrokes must never land in a terminal (they would be typed into pi).
+-- Bounce back to the agent window if a mapping (e.g. a test runner's output panel) moves focus there.
+api.nvim_create_autocmd("WinEnter", {
+  group = group,
+  callback = function()
+    if not M.busy then return end
+    local cur = api.nvim_get_current_win()
+    if is_term_win(cur) and editable(M.agent_win) then
+      vim.schedule(function()
+        if M.busy and api.nvim_get_current_win() == cur then
+          api.nvim_set_current_win(M.agent_win)
+          vim.cmd("stopinsert") -- the terminal's pending startinsert must not leak into the file buffer
+        end
+      end)
+    end
+  end,
+})
+
+function M.setup(opts)
+  M.embedded = opts and opts.embedded or false
+  M.detached = false
+end
+
+-- Undo everything that would be surprising in a host editor that outlives the pi session.
+function M.detach()
+  M.busy = false
+  M.status(nil)
+  M.end_run()
+  M.gen = M.gen + 1
+  M.attached = {}
+  pcall(api.nvim_del_augroup_by_name, "PiAgent")
+  for k, v in pairs(M.saved_opts) do vim.o[k] = v end
+  M.last_state = nil
+end
+
+---------------------------------------------------------------------------
 -- Tool lifecycle + human activity detection
 ---------------------------------------------------------------------------
 local function current_state()
@@ -125,8 +237,10 @@ end
 
 -- Called when a pi tool starts. Returns what the human did since the last tool finished, or nil.
 function M.start_tool(label)
+  local took = M.focus_editor()
   local activity = nil
   local now = current_state()
+  if took then now.mode = "n" end -- terminal mode only ends once the main loop runs
   local last = M.last_state
   if last then
     local notes = {}
@@ -389,7 +503,32 @@ function M.tests(timeout_ms)
       end
     end
   end
-  return { counts = c, failures = failures, timed_out = c.running > 0 }
+  local res = { counts = c, failures = failures, timed_out = c.running > 0 }
+  local unsaved = {}
+  for _, info in ipairs(fn.getbufinfo({ buflisted = 1 })) do
+    if info.changed == 1 and info.name ~= "" then unsaved[#unsaved + 1] = rel(info.name) end
+  end
+  if #unsaved > 0 then res.unsaved = unsaved end
+  -- Raw runner output from the neotest output panel: shows compile errors / suites that failed to run,
+  -- which per-test counts can't represent.
+  if c.failed > 0 or #failures == 0 then
+    for _, b in ipairs(api.nvim_list_bufs()) do
+      if api.nvim_buf_is_loaded(b) and (vim.bo[b].filetype == "neotest-output-panel"
+          or api.nvim_buf_get_name(b):find("Neotest Output Panel", 1, true)) then
+        local lines = api.nvim_buf_get_lines(b, math.max(0, api.nvim_buf_line_count(b) - 60), -1, false)
+        local kept = {}
+        for _, l in ipairs(lines) do
+          l = l:gsub("\27%[[%d;?]*[A-Za-z]", "")
+          if vim.trim(l) ~= "" and not l:find("node_modules") and not l:find("Test results written")
+              and not l:find("^%s*at ") then
+            kept[#kept + 1] = l
+          end
+        end
+        res.output = table.concat(vim.list_slice(kept, math.max(1, #kept - 25)), "\n")
+      end
+    end
+  end
+  return res
 end
 
 ---------------------------------------------------------------------------
@@ -630,7 +769,14 @@ end
 function M.check(quiet, timeout)
   pcall(vim.cmd, "silent! wall")
   quiet, timeout = quiet or 800, timeout or 8000
-  wait_attached(3000)
+  local function any_clients()
+    local out = {}
+    for _, c in ipairs(vim.lsp.get_clients()) do
+      if c.name ~= "GitHub Copilot" and c.name ~= "copilot" then out[#out + 1] = c end
+    end
+    return out
+  end
+  vim.wait(3000, function() return #any_clients() > 0 end, 100)
   local start = vim.uv.now()
   local last_tick, last_change = M.diag_tick, vim.uv.now()
   vim.wait(timeout, function()
@@ -641,9 +787,39 @@ function M.check(quiet, timeout)
   end, 50)
   local res = M.diagnostics(true)
   local names = {}
-  for _, c in ipairs(lsp_clients()) do names[#names + 1] = c.name end
+  for _, c in ipairs(any_clients()) do names[#names + 1] = c.name end
   res.lsp = names
   return res
+end
+
+-- The rendered screen as text (like reading the terminal), with terminal windows blanked so pi's
+-- own TUI is never fed back to the model. Works in any mode, no herdr required.
+function M.screen()
+  vim.cmd("redraw")
+  local terms = {}
+  for _, win in ipairs(api.nvim_tabpage_list_wins(0)) do
+    if is_term_win(win) and not is_float(win) then
+      local pos = fn.win_screenpos(win)
+      terms[#terms + 1] = {
+        r1 = pos[1], r2 = pos[1] + api.nvim_win_get_height(win) - 1,
+        c1 = pos[2], c2 = pos[2] + api.nvim_win_get_width(win) - 1,
+      }
+    end
+  end
+  local rows = {}
+  for r = 1, vim.o.lines do
+    local cells = {}
+    for c = 1, vim.o.columns do
+      local blank = false
+      for _, t in ipairs(terms) do
+        if r >= t.r1 and r <= t.r2 and c >= t.c1 and c <= t.c2 then blank = true; break end
+      end
+      cells[c] = blank and " " or fn.screenstring(r, c)
+    end
+    rows[r] = (table.concat(cells):gsub("%s+$", ""))
+  end
+  while #rows > 0 and rows[#rows] == "" do rows[#rows] = nil end
+  return table.concat(rows, "\n")
 end
 
 -- Small status indicator in the top-right corner so the human sees what pi is doing.
@@ -656,11 +832,18 @@ function M.status(text)
   local buf = api.nvim_create_buf(false, true)
   local line = " 🤖 pi: " .. text .. " "
   api.nvim_buf_set_lines(buf, 0, -1, false, { line })
-  local width = math.min(fn.strdisplaywidth(line), vim.o.columns - 2)
-  M.status_win = api.nvim_open_win(buf, false, {
-    relative = "editor", anchor = "NE", row = 0, col = vim.o.columns, width = width, height = 1,
+  local cfg = {
+    relative = "editor", anchor = "NE", row = 0, col = vim.o.columns, width = 1, height = 1,
     style = "minimal", focusable = false, zindex = 250, noautocmd = true,
-  })
+  }
+  local span = vim.o.columns
+  -- Inside the user's own editor, keep the badge over the window the agent works in.
+  if editable(M.agent_win) then
+    span = api.nvim_win_get_width(M.agent_win)
+    cfg.relative, cfg.win, cfg.col = "win", M.agent_win, span
+  end
+  cfg.width = math.max(1, math.min(fn.strdisplaywidth(line), span - 2))
+  M.status_win = api.nvim_open_win(buf, false, cfg)
   vim.wo[M.status_win].winhl = "Normal:IncSearch"
 end
 
