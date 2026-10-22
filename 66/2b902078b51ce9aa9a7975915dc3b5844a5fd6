@@ -1,0 +1,22 @@
+CONFIG_AGNOSTIC_PLAN.md
+  h_8a472ace01776f 83
+README.md
+  h_8a472ace01776f 97
+extension/index.ts
+  h_8a472ace01776f 32-37,41-44,49-77,81,90-93,95-107,119,123-125,129-131,133-147,155-174,178-193,197-230,234-267,271-306,310-320,324-359,363-393,397-441,445-491,500-506,510-514,518-521,524-615
+extension/lua/pi_agent.lua
+  h_8a472ace01776f 608-648
+extension/prompt.md
+  h_8a472ace01776f 12,15
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.7.5",
+  "base_commit_sha": "662b902078b51ce9aa9a7975915dc3b5844a5fd6",
+  "prompts": {},
+  "humans": {
+    "h_8a472ace01776f": {
+      "author": "Thiago Pacheco <hi@sudoish.com>"
+    }
+  }
+}
