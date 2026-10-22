@@ -1,0 +1,19 @@
+CONFIG_AGNOSTIC_PLAN.md
+  s_6709c2c2fb50bd::t_3e0cc0de58492a 1-86
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.7.5",
+  "base_commit_sha": "d75c0cf71677cd6601dc63fc29b74ecff8636307",
+  "prompts": {},
+  "sessions": {
+    "s_6709c2c2fb50bd": {
+      "agent_id": {
+        "tool": "pi",
+        "id": "01a163cc-b2f9-742f-81e6-ba3341f5a320",
+        "model": "claude-opus-4-8"
+      },
+      "human_author": "Thiago Pacheco <hi@sudoish.com>"
+    }
+  }
+}
