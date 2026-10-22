@@ -1,4 +1,4 @@
-import { applyDiscount, applyTax, subtotal, type LineItem } from "./pricing";
+import { applyDiscount, applyTax, bulkDiscount, subtotal, type LineItem } from "./pricing";
 
 const cart: LineItem[] = [
   { sku: "KB-01", unitPrice: 120, quantity: 1 },
@@ -24,5 +24,19 @@ describe("applyDiscount", () => {
 describe("applyTax", () => {
   it("adds tax and rounds to cents", () => {
     expect(applyTax(100, 0.0725)).toBe(107.25);
+  });
+});
+
+describe("bulkDiscount", () => {
+  it("takes 5% off when total quantity is 10 or more", () => {
+    const bulk: LineItem[] = [
+      { sku: "PEN-01", unitPrice: 2, quantity: 6 },
+      { sku: "PAD-02", unitPrice: 5, quantity: 4 },
+    ];
+    expect(bulkDiscount(bulk)).toBe(30.4);
+  });
+
+  it("returns the plain subtotal below 10 items", () => {
+    expect(bulkDiscount(cart)).toBe(190);
   });
 });
