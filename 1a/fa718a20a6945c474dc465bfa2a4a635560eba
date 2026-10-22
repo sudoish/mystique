@@ -1,0 +1,29 @@
+extension/lua/pi_agent.lua
+  s_2d3f1b26e8912e::t_cd21725a7c7d86 16-17,21-27,58,60,62,129-203,208-229,240,243,506-531,772-779,790,795-824,835-836,838-846
+  s_2d3f1b26e8912e::t_5147313c92e8c2 204-207
+README.md
+  s_2d3f1b26e8912e::t_a1c326af12fc59 4-5,17-62,66,69,76-77
+extension/prompt.md
+  s_2d3f1b26e8912e::t_d0463b50870f51 1-2,31-33,38-39
+extension/index.ts
+  s_2d3f1b26e8912e::t_d0f83238bd8f7c 2-4,13,425-426,430-438,448,507,537-541,547,551,575,577,579
+  s_2d3f1b26e8912e::t_5147313c92e8c2 20-23,501-503,508,514-515
+extension/nvim.ts
+  s_2d3f1b26e8912e::t_d0f83238bd8f7c 8-25,85,114-120,122-133,179,182,215-224,227,295-300,303,327-333,348-351,353-356,383-386,391-396
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.7.5",
+  "base_commit_sha": "1afa718a20a6945c474dc465bfa2a4a635560eba",
+  "prompts": {},
+  "sessions": {
+    "s_2d3f1b26e8912e": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "0d3bc5b1-f109-4150-ba71-d600e12f00c6",
+        "model": "claude-fable-5-1"
+      },
+      "human_author": "Thiago Pacheco <hi@sudoish.com>"
+    }
+  }
+}
