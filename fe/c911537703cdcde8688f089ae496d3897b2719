@@ -1,0 +1,20 @@
+extension/lua/mystique.lua
+  s_6709c2c2fb50bd::t_37725153e242f6 2-999
+  s_6709c2c2fb50bd::t_00941617b18235 1
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.7.5",
+  "base_commit_sha": "fec911537703cdcde8688f089ae496d3897b2719",
+  "prompts": {},
+  "sessions": {
+    "s_6709c2c2fb50bd": {
+      "agent_id": {
+        "tool": "pi",
+        "id": "01a163cc-b2f9-742f-81e6-ba3341f5a320",
+        "model": "claude-opus-4-8"
+      },
+      "human_author": "Thiago Pacheco <hi@sudoish.com>"
+    }
+  }
+}
