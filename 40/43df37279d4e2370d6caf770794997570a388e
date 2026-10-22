@@ -1,0 +1,46 @@
+demo-tests/src/pricing.ts
+  s_6709c2c2fb50bd::t_5d3c42115ce0e3 13,19-24
+  s_6709c2c2fb50bd::t_99ba2d601a6112 25
+demo-tests/src/fibonacci.test.ts
+  s_2bbfcd241476ea::t_87bb752254b264 1-21
+demo-tests/src/fibonacci.ts
+  s_2bbfcd241476ea::t_320ee13a4e1cc5 1-9
+demo-tests/src/pricing.test.ts
+  s_d76698e1b3e045::t_ccf39b52b2b2a2 1,29-42
+demo-tests/src/shipping.test.ts
+  s_2bbfcd241476ea::t_de6e4ac29610bb 1-48
+demo-tests/src/shipping.ts
+  s_2bbfcd241476ea::t_9d52c581c622d0 1-21
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.7.5",
+  "base_commit_sha": "4043df37279d4e2370d6caf770794997570a388e",
+  "prompts": {},
+  "sessions": {
+    "s_2bbfcd241476ea": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "e63cbe02-f9f2-484a-9c1f-9586df7f5033",
+        "model": "claude-fable-5-1"
+      },
+      "human_author": "Thiago Pacheco <hi@sudoish.com>"
+    },
+    "s_6709c2c2fb50bd": {
+      "agent_id": {
+        "tool": "pi",
+        "id": "01a163cc-b2f9-742f-81e6-ba3341f5a320",
+        "model": "claude-opus-4-8"
+      },
+      "human_author": "Thiago Pacheco <hi@sudoish.com>"
+    },
+    "s_d76698e1b3e045": {
+      "agent_id": {
+        "tool": "pi",
+        "id": "01a156c2-9c24-70a3-899e-7b14f358e061",
+        "model": "claude-opus-5-5"
+      },
+      "human_author": "Thiago Pacheco <hi@sudoish.com>"
+    }
+  }
+}
