@@ -79,6 +79,18 @@ export interface Snapshot {
   floats?: string[];
 }
 
+/** The capability manifest returned by Mystique.capabilities() (see mystique.lua). */
+export interface Caps {
+  nvim: string;
+  lsp?: { attached?: string[]; active?: string[] };
+  format?: { backend: string; how?: string };
+  test?: { backend: string; nearest?: string; file?: string; suite?: string };
+  comment?: { backend: string; how?: string };
+  treesitter?: { available?: boolean; textobjects?: boolean };
+  grep?: { prg?: string; ripgrep?: boolean };
+  commands?: string[];
+}
+
 export class NvimSession {
   client: NeovimClient | undefined;
   socket: string | undefined;
@@ -181,12 +193,47 @@ export class NvimSession {
     this.client = client;
     await this.dismissPrompts();
     await this.loadKeymaps().catch(() => { });
+    await this.loadCapabilities().catch(() => { });
     return client;
   }
 
   /** The user's leader key and an editing-relevant cheat sheet of their mappings. */
   leader = " ";
   cheatsheet: string | undefined;
+
+  /** A compact, token-light <nvim_capabilities> manifest built from Mystique.capabilities(). */
+  capabilities: string | undefined;
+
+  private async loadCapabilities(): Promise<void> {
+    const c = await this.lua<Caps>("return Mystique.capabilities()", []);
+    const lines: string[] = [];
+    lines.push(`Neovim ${c.nvim}`);
+    lines.push(`format: ${c.format?.backend ?? "builtin"}${c.format?.how ? ` (${c.format.how})` : ""} — use nvim_format`);
+    if (c.test?.backend && c.test.backend !== "none") {
+      lines.push(`test: ${c.test.backend} — use nvim_test`);
+    } else {
+      lines.push("test: none — no runner wired; fall back to bash");
+    }
+    lines.push(`comment: ${c.comment?.backend ?? "none"}${c.comment?.how ? ` (${c.comment.how})` : ""}`);
+    const attached = c.lsp?.attached ?? [];
+    const activeLsp = c.lsp?.active ?? [];
+    lines.push(
+      attached.length
+        ? `lsp: attached=${attached.join(",")}${activeLsp.length ? ` active=${activeLsp.join(",")}` : ""}`
+        : activeLsp.length
+          ? `lsp: active=${activeLsp.join(",")} (none attached to current buffer)`
+          : "lsp: none — rename/refs/definition unavailable",
+    );
+    lines.push(`grep: ${c.grep?.ripgrep ? "ripgrep" : c.grep?.prg || "vimgrep"} — use nvim_grep`);
+    lines.push(
+      c.treesitter?.textobjects
+        ? "treesitter text-objects: yes (daf/dif/]f etc. available as optional shortcuts)"
+        : c.treesitter?.available
+          ? "treesitter text-objects: no — use plain motions/text objects"
+          : "treesitter: no — use plain motions",
+    );
+    this.capabilities = lines.join("\n");
+  }
 
   private async loadKeymaps(): Promise<void> {
     const deny =

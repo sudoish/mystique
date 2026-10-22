@@ -592,7 +592,25 @@ function M.capabilities()
 
   -- Treesitter + text objects
   caps.treesitter.available = has_module("nvim-treesitter")
-  caps.treesitter.textobjects = has_module("nvim-treesitter.textobjects")
+  -- Text objects: the nvim-treesitter.textobjects module path reports false on
+  -- configs that wire text objects differently, so also treat the presence of
+  -- text-object keymaps (daf/dif/]f/[f in operator-pending or visual mode) as a
+  -- positive signal.
+  local ts_textobj = has_module("nvim-treesitter.textobjects")
+  if not ts_textobj then
+    for _, mode in ipairs({ "o", "x" }) do
+      for _, m in ipairs(api.nvim_get_keymap(mode)) do
+        if m.lhs:match("^af$") or m.lhs:match("^if$") or m.lhs:match("^ac$")
+          or m.lhs:match("^ic$") or m.lhs:match("^aa$") or m.lhs:match("^ia$")
+          or m.lhs:match("^%]f$") or m.lhs:match("^%[f$") then
+          ts_textobj = true
+          break
+        end
+      end
+      if ts_textobj then break end
+    end
+  end
+  caps.treesitter.textobjects = ts_textobj
 
   -- Grep backend
   caps.grep = { prg = vim.o.grepprg, ripgrep = vim.o.grepprg:find("rg ") ~= nil or vim.o.grepprg == "rg" }

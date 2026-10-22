@@ -25,6 +25,7 @@ const here = dirname(fileURLToPath(import.meta.url));
 const session = new NvimSession(join(here, "lua", "mystique.lua"));
 const playbook = readFileSync(join(here, "prompt.md"), "utf8");
 const cacheFile = join(homedir(), ".cache", "mystique", "keymaps.txt");
+const capFile = join(homedir(), ".cache", "mystique", "capabilities.txt");
 
 // Without a reachable Neovim (not inside one, not in herdr, no MYSTIQUE_SOCKET) the extension stays
 // inert: builtin tools and bash keep working, so a globally installed copy never cripples plain pi.
@@ -577,6 +578,21 @@ function saveCheatsheet(text: string) {
   } catch { }
 }
 
+function loadCachedCapabilities(): string | undefined {
+  try {
+    return readFileSync(capFile, "utf8");
+  } catch {
+    return undefined;
+  }
+}
+
+function saveCapabilities(text: string) {
+  try {
+    mkdirSync(dirname(capFile), { recursive: true });
+    writeFileSync(capFile, text);
+  } catch { }
+}
+
 export default function(pi: ExtensionAPI) {
   for (const t of [keysTool, exTool, insertTool, viewTool, grepTool, lspTool, checkTool, testsTool, screenTool, testTool, formatTool]) {
     pi.registerTool(t as any);
@@ -585,6 +601,7 @@ export default function(pi: ExtensionAPI) {
   async function start(ctx: ExtensionContext) {
     await session.ensure(ctx.cwd);
     if (session.cheatsheet) saveCheatsheet(session.cheatsheet);
+    if (session.capabilities) saveCapabilities(session.capabilities);
   }
 
   pi.on("session_start", async (_event, ctx) => {
@@ -606,6 +623,8 @@ export default function(pi: ExtensionAPI) {
     event.systemPromptOptions.sections.nvim_playbook = playbook;
     const sheet = session.cheatsheet ?? loadCachedCheatsheet();
     if (sheet) event.systemPromptOptions.sections.nvim_keymaps = sheet;
+    const caps = session.capabilities ?? loadCachedCapabilities();
+    if (caps) event.systemPromptOptions.sections.nvim_capabilities = caps;
   });
 
   pi.on("tool_call", async (event) => {
@@ -649,6 +668,13 @@ export default function(pi: ExtensionAPI) {
     description: "Show the keymap cheat sheet given to the agent",
     handler: async (_args, ctx) => {
       ctx.ui.notify(session.cheatsheet ?? loadCachedCheatsheet() ?? "(not loaded yet; run /nvim)", "info");
+    },
+  });
+
+  pi.registerCommand("nvim-capabilities", {
+    description: "Show the capability manifest given to the agent",
+    handler: async (_args, ctx) => {
+      ctx.ui.notify(session.capabilities ?? loadCachedCapabilities() ?? "(not loaded yet; run /nvim)", "info");
     },
   });
 

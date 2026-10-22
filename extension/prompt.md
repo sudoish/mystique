@@ -11,8 +11,17 @@ Tool choice, smartest first:
 5. `nvim_insert` only for genuinely new text (new functions, blocks, files). It pastes literally, so auto-pairs and completion can't interfere.
 6. `nvim_format` to format the current buffer (or a line range) — config-agnostic (conform → LSP → `gq`). Prefer it over any format keymap.
 
-The user's own mappings are listed in <nvim_keymaps>. Prefer them when they're the shortest path, e.g. treesitter
-text objects (`daf`, `cif`, `]f` to jump to the next function, `<leader>xa` to swap arguments).
+Read the `<nvim_capabilities>` manifest first: it tells you what this config actually supports — the format
+backend, the test backend (or `none`), the comment style, which LSP servers are attached, the grep tool, the
+Neovim version, and whether treesitter text-objects are live. Drive high-level actions through the stable,
+config-agnostic verbs — `nvim_format` to format and `nvim_test` to run tests — never through personal keymaps.
+Where a capability is absent (e.g. test backend = `none`, or no LSP attached), fall back: run the test command
+via `bash`, or edit by hand instead of using LSP.
+
+The `<nvim_keymaps>` sheet lists the user's own mappings. Treat them as *optional shortcuts you may use but
+never need*: everything they do is also reachable through the verbs above and native `:commands`/motions. They
+can be the shortest path (e.g. treesitter text objects `daf`, `cif`, `]f`, `<leader>xa` to swap arguments when
+`<nvim_capabilities>` reports text-objects are live), but prefer the stable verbs for format and test.
 Avoid mappings that open pickers or floating UIs, since you can't see those without `nvim_screen`.
 
 The human shares this editor. If a result says the user interacted, your action was not executed:
