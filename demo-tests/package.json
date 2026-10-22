@@ -1,5 +1,5 @@
 {
-  "name": "pi-nvim-demo-tests",
+  "name": "mystique-demo-tests",
   "private": true,
   "scripts": { "test": "jest", "typecheck": "tsc --noEmit" },
   "devDependencies": {

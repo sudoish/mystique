@@ -1,7 +1,7 @@
 /**
- * pi-nvim-dev — drive a live, visible Neovim as the only way to edit code.
+ * mystique — let any coding agent shapeshift into a Neovim power user and drive a live, visible editor.
  * The Neovim is either the one pi runs inside (a :terminal split, e.g. sidekick.nvim),
- * one the user points us at (PI_NVIM_SOCKET), or one we spawn in a herdr pane.
+ * one the user points us at (MYSTIQUE_SOCKET), or one we spawn in a herdr pane.
  */
 import { mkdirSync, readFileSync, writeFileSync } from "node:fs";
 import { homedir } from "node:os";
@@ -12,15 +12,24 @@ import { defineTool, type ExtensionAPI, type ExtensionContext } from "@earendil-
 import { Text } from "@earendil-works/pi-tui";
 import { detectMode, NvimSession, shellQuote, type Snapshot } from "./nvim.ts";
 
-const here = dirname(fileURLToPath(import.meta.url));
-const session = new NvimSession(join(here, "lua", "pi_agent.lua"));
-const playbook = readFileSync(join(here, "prompt.md"), "utf8");
-const cacheFile = join(homedir(), ".cache", "pi-nvim-dev", "keymaps.txt");
 
-// Without a reachable Neovim (not inside one, not in herdr, no PI_NVIM_SOCKET) the extension stays
+// Back-compat: the project used to be "pi-nvim-dev" with PI_NVIM_* env vars. Honor the old
+// names when the new MYSTIQUE_* ones aren't set, before anything reads them.
+for (const k of ["SOCKET", "SPEED", "POLICY", "CLOSE", "REFOCUS", "AUTOSTART", "KEYMAP_DENY"]) {
+  const legacy = process.env[`PI_NVIM_${k}`];
+  if (legacy !== undefined && process.env[`MYSTIQUE_${k}`] === undefined) {
+    process.env[`MYSTIQUE_${k}`] = legacy;
+  }
+}
+const here = dirname(fileURLToPath(import.meta.url));
+const session = new NvimSession(join(here, "lua", "mystique.lua"));
+const playbook = readFileSync(join(here, "prompt.md"), "utf8");
+const cacheFile = join(homedir(), ".cache", "mystique", "keymaps.txt");
+
+// Without a reachable Neovim (not inside one, not in herdr, no MYSTIQUE_SOCKET) the extension stays
 // inert: builtin tools and bash keep working, so a globally installed copy never cripples plain pi.
 const active = detectMode() !== undefined;
-const policyEnabled = active && process.env.PI_NVIM_POLICY !== "off";
+const policyEnabled = active && process.env.MYSTIQUE_POLICY !== "off";
 const DISABLED_BUILTINS = ["read", "edit", "write", "grep", "find", "ls"];
 
 // ---------------------------------------------------------------------------
@@ -255,7 +264,7 @@ const viewTool = defineTool({
   async execute(_id, p, _signal, _onUpdate, ctx) {
     return withNvim(ctx, `view ${p.path ?? "buffer"}`, false, async (notice) => {
       const v = await session.lua<{ file: string; lines: number; range: [number, number]; text: string }>(
-        "return PiAgent.view(...)",
+        "return Mystique.view(...)",
         [p.path ?? "", p.start ?? 1, p.end ?? 0],
       );
       const head = `${v.file} (${v.range[0]}-${v.range[1]} of ${v.lines})`;
@@ -346,7 +355,7 @@ const lspTool = defineTool({
   async execute(_id, p, _signal, _onUpdate, ctx) {
     const cursorFree = p.action === "workspace_symbol" || p.action === "diagnostics";
     return withNvim(ctx, `lsp ${p.action}${p.arg ? ` ${trunc(p.arg, 20)}` : ""}`, !cursorFree, async (notice) => {
-      const res = await session.lua<Record<string, unknown>>("return PiAgent.lsp(...)", [p.action, p.arg ?? ""]);
+      const res = await session.lua<Record<string, unknown>>("return Mystique.lsp(...)", [p.action, p.arg ?? ""]);
       const parts: string[] = [];
       for (const [k, v] of Object.entries(res ?? {})) {
         if (Array.isArray(v)) parts.push(`${k} (${v.length}):\n${v.join("\n")}`);
@@ -381,7 +390,7 @@ const checkTool = defineTool({
   async execute(_id, _p, _signal, _onUpdate, ctx) {
     return withNvim(ctx, "checking diagnostics", false, async (notice) => {
       const r = await session.lua<{ counts: Record<string, number>; items: string[]; lsp: string[] }>(
-        "return PiAgent.check()",
+        "return Mystique.check()",
         [],
         40000,
       );
@@ -418,7 +427,7 @@ const testsTool = defineTool({
   async execute(_id, p, _signal, _onUpdate, ctx) {
     const timeout = Math.max(5, p.timeout ?? 60);
     return withNvim(ctx, "waiting for tests", false, async (notice) => {
-      const r = await session.lua<TestResult>("return PiAgent.tests(...)", [timeout * 1000], (timeout + 15) * 1000);
+      const r = await session.lua<TestResult>("return Mystique.tests(...)", [timeout * 1000], (timeout + 15) * 1000);
       return formatTests(r, notice);
     });
   },
@@ -473,7 +482,7 @@ const testTool = defineTool({
     return withNvim(ctx, `running ${scope} tests`, false, async (notice) => {
       await session.ex("silent! wall");
       const run = await session.lua<{ backend: string; started: boolean; err?: string }>(
-        "return PiAgent.test_run(...)",
+        "return Mystique.test_run(...)",
         [scope],
         15000,
       );
@@ -482,7 +491,7 @@ const testTool = defineTool({
           notice,
         });
       }
-      const r = await session.lua<TestResult>("return PiAgent.tests(...)", [timeout * 1000], (timeout + 15) * 1000);
+      const r = await session.lua<TestResult>("return Mystique.tests(...)", [timeout * 1000], (timeout + 15) * 1000);
       return formatTests(r, notice, `ran ${scope} via ${run.backend}`);
     });
   },
@@ -527,7 +536,7 @@ const formatTool = defineTool({
   async execute(_id, p, _signal, _onUpdate, ctx) {
     return withNvim(ctx, "formatting", true, async (notice) => {
       const r = await session.lua<{ backend: string; ok: boolean; err?: string }>(
-        "return PiAgent.format(...)",
+        "return Mystique.format(...)",
         [p.first ?? null, p.last ?? null],
         15000,
       );
@@ -580,13 +589,13 @@ export default function(pi: ExtensionAPI) {
 
   pi.on("session_start", async (_event, ctx) => {
     if (!active && ctx.mode === "tui") {
-      ctx.ui.notify("nvim-dev: no Neovim detected (run pi inside Neovim, herdr, or set PI_NVIM_SOCKET); inactive", "warning");
+      ctx.ui.notify("mystique: no Neovim detected (run pi inside Neovim, herdr, or set MYSTIQUE_SOCKET); inactive", "warning");
     }
     if (policyEnabled) {
       pi.setActiveTools(pi.getActiveTools().filter((t) => !DISABLED_BUILTINS.includes(t)));
     }
     // In the interactive TUI, connect right away so the editor is visible next to (or around) pi.
-    if (ctx.mode === "tui" && active && process.env.PI_NVIM_AUTOSTART !== "0") {
+    if (ctx.mode === "tui" && active && process.env.MYSTIQUE_AUTOSTART !== "0") {
       start(ctx).catch((e) => ctx.ui.notify(`nvim: ${(e as Error).message}`, "error"));
     }
   });
@@ -621,11 +630,11 @@ export default function(pi: ExtensionAPI) {
   });
 
   pi.on("session_shutdown", async () => {
-    await session.disconnect(process.env.PI_NVIM_CLOSE === "1");
+    await session.disconnect(process.env.MYSTIQUE_CLOSE === "1");
   });
 
   pi.registerCommand("nvim", {
-    description: "Connect to Neovim: the host editor, PI_NVIM_SOCKET, or a new herdr pane",
+    description: "Connect to Neovim: the host editor, MYSTIQUE_SOCKET, or a new herdr pane",
     handler: async (_args, ctx) => {
       try {
         await start(ctx);

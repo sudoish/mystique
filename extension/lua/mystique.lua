@@ -1,9 +1,9 @@
--- pi_agent.lua — helper module loaded into the Neovim instance driven by pi.
--- Exposes _G.PiAgent with sync points, compact state snapshots, change tracking
+-- mystique.lua — helper module loaded into the Neovim instance a coding agent drives.
+-- Exposes _G.Mystique with sync points, compact state snapshots, change tracking
 -- and LSP helpers. Everything returns small, JSON-friendly tables.
 
-local M = _G.PiAgent or {}
-_G.PiAgent = M
+local M = _G.Mystique or {}
+_G.Mystique = M
 
 M.chan = M.chan or nil -- RPC channel of the pi client (for done notifications)
 M.changes = M.changes or {} -- bufnr -> list of {first, last} (1-based, inclusive)
@@ -59,8 +59,8 @@ local function track(buf)
   api.nvim_buf_attach(buf, false, {
     -- Dispatch through _G so a reloaded module takes over; a stale generation detaches (return true).
     on_lines = function(_, b, _, first, _, last_new)
-      if _G.PiAgent.gen ~= gen then return true end
-      _G.PiAgent.on_lines(b, first, last_new)
+      if _G.Mystique.gen ~= gen then return true end
+      _G.Mystique.on_lines(b, first, last_new)
     end,
     on_detach = function(_, b)
       M.attached[b] = nil
@@ -68,7 +68,7 @@ local function track(buf)
   })
 end
 
-local group = api.nvim_create_augroup("PiAgent", { clear = true })
+local group = api.nvim_create_augroup("Mystique", { clear = true })
 api.nvim_create_autocmd({ "BufReadPost", "BufNewFile", "BufEnter" }, {
   group = group,
   callback = function(ev) track(ev.buf) end,
@@ -222,7 +222,7 @@ function M.detach()
   M.end_run()
   M.gen = M.gen + 1
   M.attached = {}
-  pcall(api.nvim_del_augroup_by_name, "PiAgent")
+  pcall(api.nvim_del_augroup_by_name, "Mystique")
   for k, v in pairs(M.saved_opts) do vim.o[k] = v end
   M.last_state = nil
 end

@@ -1,4 +1,4 @@
-# pi-nvim-dev — Initial Plan
+# Mystique — Initial Plan
 
 A specialized [pi](https://github.com/earendil-works/pi) coding agent that works like a real Neovim power user.
 The agent does **all** navigation, search, editing and verification through a live Neovim instance instead of
@@ -31,7 +31,7 @@ Checked on the dev machine:
 ```
 ┌──────────────────── herdr tab ─────────────────────┐
 │ pane A: pi + nvim-dev extension                    │ pane B: nvim --listen $SOCK
-│   tools ──── msgpack-RPC over unix socket ───────▶ │   (user config + pi_agent.lua helper)
+│   tools ──── msgpack-RPC over unix socket ───────▶ │   (user config + mystique.lua helper)
 │   herdr CLI (split / rename / read) ─────────────▶ │
 └────────────────────────────────────────────────────┘
 ```
@@ -47,7 +47,7 @@ Checked on the dev machine:
 extension/
   index.ts          # session_start + /nvim command, tool registration, policy guards
   nvim.ts           # RPC client, pacing, snapshot/diff helpers
-  lua/pi_agent.lua  # loaded via: nvim --listen $SOCK -c "luafile .../pi_agent.lua"
+  lua/mystique.lua  # loaded via: nvim --listen $SOCK -c "luafile .../mystique.lua"
   prompt.md         # Neovim power-user playbook injected via before_agent_start
   package.json      # dependency: neovim
 ```
@@ -59,7 +59,7 @@ Installed by symlinking or adding to pi's extension paths (`~/.pi/agent/extensio
 ### Startup
 1. `/nvim` (or automatically on `session_start`) checks `HERDR_ENV=1`.
 2. `herdr pane split --current --direction right --cwd $PWD --no-focus`.
-3. `herdr pane run <pane> "nvim --listen /tmp/pi-nvim-<session>.sock -c 'luafile …/pi_agent.lua'"`.
+3. `herdr pane run <pane> "nvim --listen /tmp/pi-nvim-<session>.sock -c 'luafile …/mystique.lua'"`.
 4. Wait for the socket, attach the RPC client, rename the pane to `nvim (pi)`.
 5. Read the user's leader mappings (`nvim_get_keymap`) and build a compact cheat sheet for the prompt.
 

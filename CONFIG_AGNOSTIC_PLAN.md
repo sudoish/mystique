@@ -23,7 +23,7 @@ directly (not a keymap). So the fix is to push *every* high-level action down to
    regardless of config; the in-editor helper dispatches to whatever backs it, with
    graceful fallbacks.
 
-## Capability discovery (`M.capabilities()` in pi_agent.lua)
+## Capability discovery (`M.capabilities()` in mystique.lua)
 
 Run once on connect (cache like the keymap sheet). Returns a manifest:
 
@@ -60,10 +60,10 @@ These replace the prompt's `<leader>fm` / `<leader>tt` instructions.
 
 "Setup" = what runs on connect, before the first agent action:
 
-1. Load `pi_agent.lua` into the editor (already happens).
+1. Load `mystique.lua` into the editor (already happens).
 2. Define the `:Pi*` user-commands (format/test) so there is always a stable command
    surface, whatever the user's config.
-3. Run `M.capabilities()`, cache to `~/.cache/pi-nvim-dev/capabilities.json`, and build
+3. Run `M.capabilities()`, cache to `~/.cache/mystique/capabilities.json`, and build
    the `<nvim_capabilities>` prompt section.
 4. Keep the keymap cheat sheet, but demote it in the prompt to "optional shortcuts".
 5. Expose `/nvim-capabilities` (like `/nvim-keymaps`) to show the manifest to the human.

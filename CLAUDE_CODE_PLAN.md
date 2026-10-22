@@ -16,8 +16,8 @@ From `extension/nvim.ts` — none of this imports the pi SDK:
 
 - `detectMode()` — picks embedded (`$NVIM`) / external (`PI_NVIM_SOCKET`) / herdr.
 - `NvimSession` — attaches the `neovim` npm client over the unix socket, runs
-  `nvim_input`, drives the `pi_agent.lua` helper, returns `Snapshot` objects.
-- `lua/pi_agent.lua` — the in-editor helper (snapshots, changed-line diffs, activity
+  `nvim_input`, drives the `mystique.lua` helper, returns `Snapshot` objects.
+- `lua/mystique.lua` — the in-editor helper (snapshots, changed-line diffs, activity
   guard, screen capture, keymap cheat sheet).
 - The `Snapshot` protocol and all the snapshot/diff formatting.
 
@@ -31,7 +31,7 @@ Only `extension/index.ts` is pi-specific: `defineTool`, the TUI renderers, and t
 │ claude  ── stdio ──▶ mcp-nvim server (node)             │
 │                         │                                │
 │                         └── msgpack-RPC ──▶ nvim --listen $SOCK
-│                                                (user config + pi_agent.lua)
+│                                                (user config + mystique.lua)
 │ PreToolUse hook: deny Read/Edit/Write/Grep/Glob,         │
 │   point the model at the nvim_* MCP tools                │
 └──────────────────────────────────────────────────────────┘
@@ -40,7 +40,7 @@ Only `extension/index.ts` is pi-specific: `defineTool`, the TUI renderers, and t
 ## Work breakdown
 
 ### 1. Extract the shared core into a package
-- Move `nvim.ts` + `lua/pi_agent.lua` + `prompt.md` into a `core/` module that has
+- Move `nvim.ts` + `lua/mystique.lua` + `prompt.md` into a `core/` module that has
   no pi imports. `extension/index.ts` (pi) and the new MCP server both depend on it.
 - Keeps one source of truth for the session, the Lua helper and the playbook text.
 
