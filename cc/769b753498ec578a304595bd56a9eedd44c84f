@@ -1,0 +1,19 @@
+extension/package-lock.json
+  s_1b069e4f66bbbb::t_6131a5116d7401 12-14,37-478,562-603,616-630,788-806
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.7.5",
+  "base_commit_sha": "cc769b753498ec578a304595bd56a9eedd44c84f",
+  "prompts": {},
+  "sessions": {
+    "s_1b069e4f66bbbb": {
+      "agent_id": {
+        "tool": "pi",
+        "id": "01a16474-ac4b-771f-b7e3-92fb8cb757dc",
+        "model": "claude-opus-4-8"
+      },
+      "human_author": "Thiago Pacheco <hi@sudoish.com>"
+    }
+  }
+}
