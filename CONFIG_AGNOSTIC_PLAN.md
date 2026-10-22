@@ -81,6 +81,6 @@ These replace the prompt's `<leader>fm` / `<leader>tt` instructions.
 
 1. `M.capabilities()` probe + `/nvim-capabilities` + cached manifest injected.
 2. (done) `format` verb (conform -> LSP -> gq) wired as `nvim_format`; the format keymap dropped from prompt.
-3. `test_run` verb (neotest → vim-test) wired; drop `<leader>t*` from the prompt.
+3. (done) `test_run` verb (neotest, else vim-test) wired as `nvim_test` (runs + waits); the test keymaps dropped from prompt.
 4. Prompt rewrite; keymaps demoted to optional.
 5. Validate on this config *and* a stock `nvim -u NONE`-ish config (no neotest/conform).

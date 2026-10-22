@@ -647,6 +647,40 @@ function M.format(first, last)
 end
 
 ---------------------------------------------------------------------------
+-- Run tests: config-agnostic. neotest → vim-test. scope ∈ nearest|file|suite.
+-- Only starts the run; read results afterwards with M.tests().
+---------------------------------------------------------------------------
+function M.test_run(scope)
+  scope = (scope ~= vim.NIL and scope) or "nearest"
+
+  if has_module("neotest") then
+    local neotest = require("neotest")
+    local ok, err = pcall(function()
+      if scope == "file" then
+        neotest.run.run(vim.fn.expand("%:p"))
+      elseif scope == "suite" then
+        neotest.run.run({ suite = true })
+      else
+        neotest.run.run()
+      end
+    end)
+    if not ok then return { backend = "neotest", scope = scope, started = false, err = tostring(err) } end
+    return { backend = "neotest", scope = scope, started = true }
+  end
+
+  -- vim-test: :TestNearest / :TestFile / :TestSuite
+  local cmd = ({ nearest = "TestNearest", file = "TestFile", suite = "TestSuite" })[scope]
+  if cmd and fn.exists(":" .. cmd) == 2 then
+    local ok, err = pcall(vim.cmd, cmd)
+    if not ok then return { backend = "vim-test", scope = scope, started = false, err = tostring(err) } end
+    return { backend = "vim-test", scope = scope, started = true }
+  end
+
+  return { backend = "none", scope = scope, started = false,
+    err = "no test runner (neotest or vim-test) found; run tests with bash" }
+end
+
+---------------------------------------------------------------------------
 -- Buffer reading
 ---------------------------------------------------------------------------
 function M.view(path, first, last)

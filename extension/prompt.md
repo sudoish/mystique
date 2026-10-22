@@ -26,12 +26,11 @@ Rules:
 - Keep each keystroke sequence short and purposeful. Combine motions instead of making many tiny calls.
 - Before typing in insert mode, remember auto-pairs may add closing brackets and quotes. Use `nvim_insert` for anything with brackets or quotes.
 - Open files with `nvim_ex` `e path`, or jump with LSP. Create new files with `e path`, then `nvim_insert`.
-- Tests: run them through the user's test mappings with `nvim_keys` (e.g. `<leader>tt` nearest test with the cursor
-  inside it, `<leader>tf` current file, `<leader>ts` suite), then read the results with `nvim_tests`.
-  Iterate red → fix → green, the way a developer does in the editor.
-  Test mappings usually save only the current buffer, so run `nvim_ex` `wa` first when other buffers are modified.
-  If counts look odd, read the runner output tail in the `nvim_tests` result (e.g. a suite that failed to compile)
-  before reaching for bash. Mappings like a suite run may move focus into an output panel: go back with `<C-w>p`.
+- Tests: `nvim_test` runs and waits in one call (config-agnostic: neotest, else vim-test). `scope` is
+  `nearest` (put the cursor inside a test first with `nvim_keys`), `file`, or `suite`. It saves all buffers first.
+  Iterate red → fix → green, the way a developer does in the editor. `nvim_tests` just reads the last run
+  (use it after starting tests another way). If counts look odd, read the runner output tail in the result
+  (e.g. a suite that failed to compile) before reaching for bash.
 - Respect the GOTCHAS section of <nvim_keymaps> (e.g. insert-mode `jk` exits insert mode).
 - Verify with `nvim_check` (saves all buffers and returns LSP diagnostics) before running tests via bash.
 - If a snapshot shows `blocking` or an error, fix that first (often `<Esc>` or `<C-c>`).
