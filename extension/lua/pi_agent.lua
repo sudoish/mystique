@@ -532,6 +532,80 @@ function M.tests(timeout_ms)
 end
 
 ---------------------------------------------------------------------------
+-- Capability discovery: what this config supports, so the agent uses native
+-- commands/APIs instead of personal keymaps. Returns a JSON-friendly manifest.
+---------------------------------------------------------------------------
+local function has_module(name)
+  local ok = pcall(require, name)
+  return ok
+end
+
+local function has_command(name)
+  return fn.exists(":" .. name) == 2
+end
+
+function M.capabilities()
+  local v = vim.version()
+  local caps = {
+    nvim = string.format("%d.%d.%d", v.major, v.minor, v.patch),
+    lsp = {},
+    treesitter = {},
+    commands = {},
+  }
+
+  -- LSP clients: those attached to the current buffer, plus all active ones.
+  local buf = api.nvim_get_current_buf()
+  local attached = {}
+  for _, c in ipairs(vim.lsp.get_clients({ bufnr = buf })) do attached[#attached + 1] = c.name end
+  local active = {}
+  for _, c in ipairs(vim.lsp.get_clients()) do active[#active + 1] = c.name end
+  caps.lsp.attached = attached
+  caps.lsp.active = active
+
+  -- Formatter: conform → LSP format → gq/=
+  if has_module("conform") then
+    caps.format = { backend = "conform", how = "require('conform').format()" }
+  elseif #active > 0 then
+    caps.format = { backend = "lsp", how = "vim.lsp.buf.format()" }
+  else
+    caps.format = { backend = "builtin", how = "gggqG or =" }
+  end
+
+  -- Test runner: neotest → vim-test → none
+  if has_module("neotest") then
+    caps.test = { backend = "neotest", nearest = "require('neotest').run.run()",
+      file = "require('neotest').run.run(vim.fn.expand('%'))", suite = "require('neotest').run.run({ suite = true })" }
+  elseif has_command("TestNearest") then
+    caps.test = { backend = "vim-test", nearest = ":TestNearest", file = ":TestFile", suite = ":TestSuite" }
+  else
+    caps.test = { backend = "none" }
+  end
+
+  -- Comment: built-in gc (Neovim >= 0.10) → Comment.nvim → none
+  if v.major > 0 or v.minor >= 10 then
+    caps.comment = { backend = "builtin", how = "gc operator (gcc, gcap)" }
+  elseif has_module("Comment") then
+    caps.comment = { backend = "Comment.nvim", how = "gc operator" }
+  else
+    caps.comment = { backend = "none" }
+  end
+
+  -- Treesitter + text objects
+  caps.treesitter.available = has_module("nvim-treesitter")
+  caps.treesitter.textobjects = has_module("nvim-treesitter.textobjects")
+
+  -- Grep backend
+  caps.grep = { prg = vim.o.grepprg, ripgrep = vim.o.grepprg:find("rg ") ~= nil or vim.o.grepprg == "rg" }
+
+  -- Relevant user :commands (non-builtin), capped.
+  for _, name in ipairs(fn.getcompletion("", "command")) do
+    if name:match("^%u") and #caps.commands < 40 then caps.commands[#caps.commands + 1] = name end
+  end
+
+  return caps
+end
+
+---------------------------------------------------------------------------
 -- Buffer reading
 ---------------------------------------------------------------------------
 function M.view(path, first, last)
