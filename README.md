@@ -94,7 +94,7 @@ and motions first, then leader maps). It's cached in `~/.cache/pi-nvim-dev/keyma
 
 ### Tools
 
-`nvim_keys`, `nvim_ex`, `nvim_insert`, `nvim_view`, `nvim_grep`, `nvim_lsp`, `nvim_check`, `nvim_screen`.
+`nvim_keys`, `nvim_ex`, `nvim_insert`, `nvim_view`, `nvim_grep`, `nvim_lsp`, `nvim_check`, `nvim_screen`, `nvim_format`.
 The built-in `read`/`edit`/`write`/`grep`/`find`/`ls` tools are disabled. Bash commands that bypass the editor
 (`sed -i`, redirects, `cat file`, `rg`) are blocked, and all buffers are saved before every allowed bash call.
 

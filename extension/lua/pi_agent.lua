@@ -606,6 +606,47 @@ function M.capabilities()
 end
 
 ---------------------------------------------------------------------------
+-- Format: config-agnostic. conform → LSP format → gq. Optional line range.
+---------------------------------------------------------------------------
+function M.format(first, last)
+  if first == vim.NIL then first = nil end
+  if last == vim.NIL then last = nil end
+  local buf = api.nvim_get_current_buf()
+  local range = nil
+  if first and last then
+    range = { start = { first, 0 }, ["end"] = { last, 0 } }
+  end
+
+  if has_module("conform") then
+    local opts = { bufnr = buf, async = false, lsp_format = "fallback", timeout_ms = 5000 }
+    if range then opts.range = { start = { first - 1, 0 }, ["end"] = { last, 0 } } end
+    local ok, err = pcall(function() require("conform").format(opts) end)
+    if not ok then return { backend = "conform", ok = false, err = tostring(err) } end
+    return { backend = "conform", ok = true }
+  end
+
+  if #vim.lsp.get_clients({ bufnr = buf }) > 0 then
+    local opts = { bufnr = buf, async = false, timeout_ms = 5000 }
+    if range then opts.range = range end
+    local ok, err = pcall(function() vim.lsp.buf.format(opts) end)
+    if not ok then return { backend = "lsp", ok = false, err = tostring(err) } end
+    return { backend = "lsp", ok = true }
+  end
+
+  -- Built-in fallback: gq the range (or whole buffer) via the current formatprg/formatexpr.
+  local ok, err = pcall(function()
+    if range then
+      api.nvim_win_set_cursor(0, { first, 0 })
+      vim.cmd(string.format("normal! %dGgq%dG", first, last))
+    else
+      vim.cmd("normal! gggqG")
+    end
+  end)
+  if not ok then return { backend = "builtin", ok = false, err = tostring(err) } end
+  return { backend = "builtin", ok = true }
+end
+
+---------------------------------------------------------------------------
 -- Buffer reading
 ---------------------------------------------------------------------------
 function M.view(path, first, last)

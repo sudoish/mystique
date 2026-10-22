@@ -9,9 +9,10 @@ Tool choice, smartest first:
 4. `nvim_keys` for local edits with motions and text objects: `ciw`, `ci"`, `da(`, `dap`, `yip`, `>i{`, `*`, `n`, `.`, `%`, `f`/`t`, counts, macros (`qa…q`, `@a`, `@@`), registers (`"ayy`, `"ap`).
    Search moves the cursor: `/pattern<CR>`. Jump to a line: `42G`.
 5. `nvim_insert` only for genuinely new text (new functions, blocks, files). It pastes literally, so auto-pairs and completion can't interfere.
+6. `nvim_format` to format the current buffer (or a line range) — config-agnostic (conform → LSP → `gq`). Prefer it over any format keymap.
 
 The user's own mappings are listed in <nvim_keymaps>. Prefer them when they're the shortest path, e.g. treesitter
-text objects (`daf`, `cif`, `]f` to jump to the next function, `<leader>xa` to swap arguments) and `<leader>fm` to format.
+text objects (`daf`, `cif`, `]f` to jump to the next function, `<leader>xa` to swap arguments).
 Avoid mappings that open pickers or floating UIs, since you can't see those without `nvim_screen`.
 
 The human shares this editor. If a result says the user interacted, your action was not executed:
