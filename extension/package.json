@@ -3,6 +3,7 @@
   "private": true,
   "version": "0.1.0",
   "type": "module",
+  "scripts": { "test": "tsx --test *.test.ts" },
   "pi": {
     "extensions": [
       "./index.ts"
@@ -10,5 +11,8 @@
   },
   "dependencies": {
     "neovim": "^5.5.0"
+  },
+  "devDependencies": {
+    "tsx": "^4.23.15"
   }
 }

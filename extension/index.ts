@@ -10,7 +10,7 @@ import { fileURLToPath } from "node:url";
 import { StringEnum, Type } from "@earendil-works/pi-ai";
 import { defineTool, type ExtensionAPI, type ExtensionContext } from "@earendil-works/pi-coding-agent";
 import { Text } from "@earendil-works/pi-tui";
-import { detectMode, NvimSession, shellQuote, type Snapshot } from "./nvim.ts";
+import { type Caps, detectMode, NvimSession, renderCapabilities, shellQuote, type Snapshot } from "./nvim.ts";
 
 
 // Back-compat: the project used to be "pi-nvim-dev" with PI_NVIM_* env vars. Honor the old
@@ -25,7 +25,7 @@ const here = dirname(fileURLToPath(import.meta.url));
 const session = new NvimSession(join(here, "lua", "mystique.lua"));
 const playbook = readFileSync(join(here, "prompt.md"), "utf8");
 const cacheFile = join(homedir(), ".cache", "mystique", "keymaps.txt");
-const capFile = join(homedir(), ".cache", "mystique", "capabilities.txt");
+const capFile = join(homedir(), ".cache", "mystique", "capabilities.json");
 
 // Without a reachable Neovim (not inside one, not in herdr, no MYSTIQUE_SOCKET) the extension stays
 // inert: builtin tools and bash keep working, so a globally installed copy never cripples plain pi.
@@ -444,6 +444,11 @@ function formatTests(r: TestResult, notice?: string, prefix?: string) {
     notice,
     prefix,
     summary,
+    // A freshly-triggered run that collected nothing usually means no neotest adapter covers this
+    // path (adapters root on package.json/config, so sub-projects can be missed). Say so, don't imply success.
+    prefix && c.total === 0 && !r.timed_out
+      ? "NOTE: 0 tests collected — no test runner adapter matched this file/scope. Run the project's test command directly via bash."
+      : "",
     r.unsaved?.length
       ? `WARNING: unsaved buffers (${r.unsaved.join(", ")}): tests ran against the files on disk. Run \`wa\` and re-run.`
       : "",
@@ -578,18 +583,19 @@ function saveCheatsheet(text: string) {
   } catch { }
 }
 
+/** The cached capability manifest, rendered from the structured JSON so reconnects stay consistent. */
 function loadCachedCapabilities(): string | undefined {
   try {
-    return readFileSync(capFile, "utf8");
+    return renderCapabilities(JSON.parse(readFileSync(capFile, "utf8")) as Caps);
   } catch {
     return undefined;
   }
 }
 
-function saveCapabilities(text: string) {
+function saveCapabilities(caps: Caps) {
   try {
     mkdirSync(dirname(capFile), { recursive: true });
-    writeFileSync(capFile, text);
+    writeFileSync(capFile, JSON.stringify(caps));
   } catch { }
 }
 
@@ -601,7 +607,7 @@ export default function(pi: ExtensionAPI) {
   async function start(ctx: ExtensionContext) {
     await session.ensure(ctx.cwd);
     if (session.cheatsheet) saveCheatsheet(session.cheatsheet);
-    if (session.capabilities) saveCapabilities(session.capabilities);
+    if (session.caps) saveCapabilities(session.caps);
   }
 
   pi.on("session_start", async (_event, ctx) => {
@@ -623,6 +629,12 @@ export default function(pi: ExtensionAPI) {
     event.systemPromptOptions.sections.nvim_playbook = playbook;
     const sheet = session.cheatsheet ?? loadCachedCheatsheet();
     if (sheet) event.systemPromptOptions.sections.nvim_keymaps = sheet;
+    // Capabilities drift per buffer (attached LSP, treesitter), so refresh them live each turn
+    // when connected; otherwise fall back to the cached manifest.
+    if (session.connected) {
+      await session.loadCapabilities().catch(() => { });
+      if (session.caps) saveCapabilities(session.caps);
+    }
     const caps = session.capabilities ?? loadCachedCapabilities();
     if (caps) event.systemPromptOptions.sections.nvim_capabilities = caps;
   });

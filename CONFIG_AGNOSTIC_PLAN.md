@@ -62,9 +62,9 @@ These replace the prompt's `<leader>fm` / `<leader>tt` instructions.
 
 1. Load `mystique.lua` into the editor (already happens).
 2. Define the `:Pi*` user-commands (format/test) so there is always a stable command
-   surface, whatever the user's config.
+   surface, whatever the user's config. (Implemented instead as the config-agnostic `nvim_format`/`nvim_test` tool verbs, which dispatch to conform/LSP/gq and neotest/vim-test; no `:Pi*` commands were needed.)
 3. Run `M.capabilities()`, cache to `~/.cache/mystique/capabilities.json`, and build
-   the `<nvim_capabilities>` prompt section.
+   the `<nvim_capabilities>` prompt section. (refreshed live each agent turn so per-buffer LSP/treesitter stay accurate; cached JSON survives reconnects)
 4. Keep the keymap cheat sheet, but demote it in the prompt to "optional shortcuts".
 5. Expose `/nvim-capabilities` (like `/nvim-keymaps`) to show the manifest to the human.
 
@@ -83,4 +83,4 @@ These replace the prompt's `<leader>fm` / `<leader>tt` instructions.
 2. (done) `format` verb (conform -> LSP -> gq) wired as `nvim_format`; the format keymap dropped from prompt.
 3. (done) `test_run` verb (neotest, else vim-test) wired as `nvim_test` (runs + waits); the test keymaps dropped from prompt.
 4. (done) Prompt rewrite; keymaps demoted to optional.
-5. Validate on this config *and* a stock `nvim -u NONE`-ish config (no neotest/conform).
+5. (done) Validated on this config *and* a stock `nvim -u NONE`-ish config. Headless `nvim -u NONE` returns the degraded manifest (format=builtin, test=none, lsp=none, treesitter=no); `renderCapabilities` covers both in `extension/nvim.test.ts` (`npm test`).

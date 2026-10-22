@@ -91,6 +91,42 @@ export interface Caps {
   commands?: string[];
 }
 
+/** Render the compact, token-light <nvim_capabilities> prompt section from a manifest. */
+export function renderCapabilities(c: Caps): string {
+  const lines: string[] = [];
+  lines.push(`Neovim ${c.nvim}. This section is probed from the live config each turn; use it to pick tools.`);
+  lines.push(`format: ${c.format?.backend ?? "builtin"}${c.format?.how ? ` (${c.format.how})` : ""} — use nvim_format`);
+  if (c.test?.backend && c.test.backend !== "none") {
+    lines.push(`test: ${c.test.backend} — use nvim_test (nearest/file/suite)`);
+  } else {
+    lines.push("test: none — no runner wired; run the project's test command via bash");
+  }
+  lines.push(`comment: ${c.comment?.backend ?? "none"}${c.comment?.how ? ` (${c.comment.how})` : ""}`);
+  const attached = c.lsp?.attached ?? [];
+  const activeLsp = c.lsp?.active ?? [];
+  if (attached.length) {
+    lines.push(`lsp: ${attached.join(",")} attached to the current buffer — use nvim_lsp for rename/refs/definition`);
+  } else if (activeLsp.length) {
+    lines.push(`lsp: none on the current buffer (active elsewhere: ${activeLsp.join(",")}); open a real source file before nvim_lsp`);
+  } else {
+    lines.push("lsp: none — rename/refs/definition unavailable; edit by hand");
+  }
+  lines.push(`grep: ${c.grep?.ripgrep ? "ripgrep" : c.grep?.prg || "vimgrep"} — use nvim_grep`);
+  if (c.treesitter?.textobjects) {
+    lines.push("treesitter text-objects: yes (daf/dif/]f etc. are optional shortcuts)");
+  } else if (c.treesitter?.available) {
+    lines.push("treesitter text-objects: no — use plain motions/text objects");
+  } else {
+    lines.push("treesitter: no — use plain motions");
+  }
+  // Surface config-defined commands relevant to editing workflows (format/test/lint/lsp/fix/etc.).
+  const relevant = (c.commands ?? []).filter((n) =>
+    /format|prettier|eslint|lint|test|jest|vitest|lsp|fix|organize|conform|rustfmt|gofmt|black|ruff/i.test(n),
+  );
+  if (relevant.length) lines.push(`notable :commands: ${relevant.slice(0, 12).join(" ")}`);
+  return lines.join("\n");
+}
+
 export class NvimSession {
   client: NeovimClient | undefined;
   socket: string | undefined;
@@ -201,38 +237,18 @@ export class NvimSession {
   leader = " ";
   cheatsheet: string | undefined;
 
-  /** A compact, token-light <nvim_capabilities> manifest built from Mystique.capabilities(). */
+  /** The structured capability manifest (see Mystique.capabilities()), and its rendered text. */
+  caps: Caps | undefined;
   capabilities: string | undefined;
 
-  private async loadCapabilities(): Promise<void> {
-    const c = await this.lua<Caps>("return Mystique.capabilities()", []);
-    const lines: string[] = [];
-    lines.push(`Neovim ${c.nvim}`);
-    lines.push(`format: ${c.format?.backend ?? "builtin"}${c.format?.how ? ` (${c.format.how})` : ""} — use nvim_format`);
-    if (c.test?.backend && c.test.backend !== "none") {
-      lines.push(`test: ${c.test.backend} — use nvim_test`);
-    } else {
-      lines.push("test: none — no runner wired; fall back to bash");
-    }
-    lines.push(`comment: ${c.comment?.backend ?? "none"}${c.comment?.how ? ` (${c.comment.how})` : ""}`);
-    const attached = c.lsp?.attached ?? [];
-    const activeLsp = c.lsp?.active ?? [];
-    lines.push(
-      attached.length
-        ? `lsp: attached=${attached.join(",")}${activeLsp.length ? ` active=${activeLsp.join(",")}` : ""}`
-        : activeLsp.length
-          ? `lsp: active=${activeLsp.join(",")} (none attached to current buffer)`
-          : "lsp: none — rename/refs/definition unavailable",
-    );
-    lines.push(`grep: ${c.grep?.ripgrep ? "ripgrep" : c.grep?.prg || "vimgrep"} — use nvim_grep`);
-    lines.push(
-      c.treesitter?.textobjects
-        ? "treesitter text-objects: yes (daf/dif/]f etc. available as optional shortcuts)"
-        : c.treesitter?.available
-          ? "treesitter text-objects: no — use plain motions/text objects"
-          : "treesitter: no — use plain motions",
-    );
-    this.capabilities = lines.join("\n");
+  /**
+   * Probe the live config for capabilities and render the <nvim_capabilities> section.
+   * Safe to call repeatedly: the per-buffer parts (attached LSP, treesitter) reflect whatever
+   * buffer is current when it runs, so we refresh it each agent turn to avoid stale data.
+   */
+  async loadCapabilities(): Promise<void> {
+    this.caps = await this.lua<Caps>("return Mystique.capabilities()", []);
+    this.capabilities = renderCapabilities(this.caps);
   }
 
   private async loadKeymaps(): Promise<void> {
