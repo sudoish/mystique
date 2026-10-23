@@ -39,8 +39,11 @@ const fail = (text: string): TextResult => ({ content: [{ type: "text", text }],
 export function createServer(session: NvimSession): McpServer {
   const server = new McpServer({ name: "mystique-mcp-nvim", version: "0.1.0" });
 
-  // Ensure a connection, then run a tool body; surface connection/tool errors as text.
-  const run = async (fn: () => Promise<string>): Promise<TextResult> => {
+  // Run a tool body with the shared-editor activity guard (mirrors the pi extension's
+  // withNvim): detect what the human did since the last tool; for cursor-sensitive
+  // tools, skip and report the new state so the agent re-plans; otherwise run and
+  // prepend any human-activity notice.
+  const run = async (label: string, guard: boolean, fn: () => Promise<string>): Promise<TextResult> => {
     if (detectMode() === undefined) {
       return fail(
         "No Neovim to drive. Start `nvim --listen <sock>` and set MYSTIQUE_SOCKET=<sock>, run inside a Neovim " +
@@ -49,7 +52,18 @@ export function createServer(session: NvimSession): McpServer {
     }
     try {
       await session.ensure(process.cwd());
-      return ok(await fn());
+      const activity = await session.startTool(label);
+      try {
+        const notice = activity ? `The user interacted with Neovim since your last action:\n${activity}` : "";
+        if (activity && guard) {
+          const snap = tools.snapshotToText(await session.snapshot());
+          return ok(`${notice}\nYour action was NOT executed. Re-check the state below and re-plan.\n${snap}`);
+        }
+        const text = await fn();
+        return ok(notice ? `${notice}\n${text}` : text);
+      } finally {
+        await session.endTool();
+      }
     } catch (e) {
       return fail(`ERROR: ${(e as Error).message}`);
     }
@@ -63,7 +77,7 @@ export function createServer(session: NvimSession): McpServer {
         "Motions, text objects, operators, counts, macros, registers, search. Returns a compact editor snapshot.",
       inputSchema: { keys: z.string().describe("Keys in Vim notation, e.g. ciwnewName<Esc>") },
     },
-    (a) => run(() => tools.keys(session, a.keys)),
+    (a) => run("keys", true, () => tools.keys(session, a.keys)),
   );
 
   server.registerTool(
@@ -74,7 +88,7 @@ export function createServer(session: NvimSession): McpServer {
         "cdo s/a/b/g | update, 10,20norm A;, w. Returns command output and a snapshot.",
       inputSchema: { cmd: z.string().describe("Ex command without the leading ':'") },
     },
-    (a) => run(() => tools.ex(session, a.cmd)),
+    (a) => run("ex", true, () => tools.ex(session, a.cmd)),
   );
 
   server.registerTool(
@@ -88,7 +102,7 @@ export function createServer(session: NvimSession): McpServer {
         where: z.enum(["below", "above", "before", "after"]).optional().describe("Default: below"),
       },
     },
-    (a) => run(() => tools.insert(session, a.text, a.where)),
+    (a) => run("insert", true, () => tools.insert(session, a.text, a.where)),
   );
 
   server.registerTool(
@@ -103,7 +117,7 @@ export function createServer(session: NvimSession): McpServer {
         end: z.number().optional().describe("Last line (default start+199)"),
       },
     },
-    (a) => run(() => tools.view(session, a.path, a.start, a.end)),
+    (a) => run("view", false, () => tools.view(session, a.path, a.start, a.end)),
   );
 
   server.registerTool(
@@ -115,7 +129,7 @@ export function createServer(session: NvimSession): McpServer {
         glob: z.string().optional().describe("Optional file glob, e.g. '*.ts'"),
       },
     },
-    (a) => run(() => tools.grep(session, a.pattern, a.glob)),
+    (a) => run("grep", false, () => tools.grep(session, a.pattern, a.glob)),
   );
 
   server.registerTool(
@@ -130,7 +144,7 @@ export function createServer(session: NvimSession): McpServer {
         arg: z.string().optional().describe("New name, query, action index/title, or 'workspace'"),
       },
     },
-    (a) => run(() => tools.lsp(session, a.action, a.arg)),
+    (a) => run(`lsp ${a.action}`, a.action !== "workspace_symbol" && a.action !== "diagnostics", () => tools.lsp(session, a.action, a.arg)),
   );
 
   server.registerTool(
@@ -139,7 +153,7 @@ export function createServer(session: NvimSession): McpServer {
       description: "Save all buffers, wait for LSP diagnostics to settle, and return workspace errors and warnings.",
       inputSchema: {},
     },
-    () => run(() => tools.check(session)),
+    () => run("check", false, () => tools.check(session)),
   );
 
   server.registerTool(
@@ -148,7 +162,7 @@ export function createServer(session: NvimSession): McpServer {
       description: "Read the results of the most recent test run (waits for in-flight runs). Prefer nvim_test to start one.",
       inputSchema: { timeout: z.number().optional().describe("Max seconds to wait (default 60)") },
     },
-    (a) => run(() => tools.tests(session, a.timeout)),
+    (a) => run("tests", false, () => tools.tests(session, a.timeout)),
   );
 
   server.registerTool(
@@ -162,7 +176,7 @@ export function createServer(session: NvimSession): McpServer {
         timeout: z.number().optional().describe("Max seconds to wait (default 60)"),
       },
     },
-    (a) => run(() => tools.testRun(session, a.scope, a.timeout)),
+    (a) => run("test", false, () => tools.testRun(session, a.scope, a.timeout)),
   );
 
   server.registerTool(
@@ -171,7 +185,7 @@ export function createServer(session: NvimSession): McpServer {
       description: "Read the visible Neovim screen as text. Only for floating UIs or prompts a snapshot can't describe.",
       inputSchema: {},
     },
-    () => run(() => tools.screen(session)),
+    () => run("screen", false, () => tools.screen(session)),
   );
 
   server.registerTool(
@@ -184,7 +198,7 @@ export function createServer(session: NvimSession): McpServer {
         last: z.number().optional().describe("Last line of a range (1-based)"),
       },
     },
-    (a) => run(() => tools.format(session, a.first, a.last)),
+    (a) => run("format", true, () => tools.format(session, a.first, a.last)),
   );
 
   return server;
