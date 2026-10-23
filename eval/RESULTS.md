@@ -5,7 +5,7 @@ output; this file is the curated record. Reproduce with:
 
 ```bash
 cd eval
-npm run run-eval -- --tasks fix-type-errors,rename-and-fix \
+npm run run-eval -- --tasks fix-type-errors,rename-and-fix,multi-file-rename \
   --modes baseline,mystique --trials 3 --model anthropic/claude-haiku-4-5
 ```
 
@@ -20,6 +20,8 @@ pi (`--no-extensions`); it does not load Mystique, so prompt changes don't affec
 | fix-type-errors | mystique | 100% (3) | 125,156 | 14.0 | 14.7 | 46.6s |
 | rename-and-fix | baseline | 100% (3) | 44,645 | 9.3 | 8.3 | 32.0s |
 | rename-and-fix | mystique | 100% (3) | 124,650 | 14.0 | 15.0 | 45.9s |
+| multi-file-rename | baseline | 100% (3) | 38,638 | 16.0 | 6.3 | 31.3s |
+| multi-file-rename | mystique | 100% (3) | 39,709 | 4.3 | 5.3 | 21.2s |
 
 ### Mystique vs baseline (Δ)
 
@@ -27,6 +29,7 @@ pi (`--no-extensions`); it does not load Mystique, so prompt changes don't affec
 |---|--:|--:|
 | fix-type-errors | +258% | +92% |
 | rename-and-fix | +179% | +51% |
+| multi-file-rename | +3% | -73% |
 
 ## Prompt-overhead optimization (before → after)
 
@@ -51,11 +54,17 @@ turns re-viewing to confirm edits, which the "trust the snapshot" rule removes.
 - **Mystique still costs more on these trivial single-file tasks** (+179–258%
   tokens), because its fixed per-turn context is larger (playbook + 11 tool
   schemas vs 4 builtin tools) and it takes more, smaller steps than one `edit`.
-  These fixtures are Mystique's worst case — no multi-site refactor or navigation
-  where LSP rename / `:cdo` / quickfix pay off, and no human-visibility value.
+  These fixtures are Mystique's worst case — no multi-site refactor or navigation where LSP rename / `:cdo` / quickfix pay off.
+- **The overhead vanishes as the task scales out.** On `multi-file-rename` (one
+  symbol across 6 files) Mystique matched baseline on tokens (+3%, within noise)
+  with **73% fewer tool calls** (4.3 vs 16.0) and finished faster: it ran a
+  grep → `:cdo s/…/…/g | update` sweep in a few calls, while baseline opened and
+  edited each file. The more sites a change touches, the more the editor's batch
+  operations pay for the fixed prompt overhead — and this ran without LSP (plain
+  `nvim -u NONE`); a real `nvim_lsp` rename would be tighter still.
 
 ## Next
 
-- Larger multi-file tasks (project-wide LSP rename, `:cdo` sweep, TDD loop) where
-  editor power should narrow the gap further.
+- Bigger multi-file tasks and a real-LSP environment (an `nvim_lsp` rename) to push the multi-file advantage further.
+- A TDD loop task exercising `nvim_test` red → green.
 - Report cost (USD) alongside tokens; add a cheap/other-model column.

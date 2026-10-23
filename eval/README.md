@@ -32,6 +32,7 @@ For each **task × mode × trial** the harness (`src/run.ts`):
 |---|---|---|
 | `fix-type-errors` | fix two TS type errors | `tsc --noEmit` clean |
 | `rename-and-fix` | rename `calc`→`cartTotal` everywhere and fix the errors | `tsc` clean + old name gone |
+| `multi-file-rename` | rename `getUser`→`fetchUser` across 6 files | `tsc` clean + old name gone everywhere |
 
 Each task has a `solution/` fixture used only by the self-test to prove the check
 passes on a correct result and fails on the untouched `initial/`.

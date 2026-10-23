@@ -5,7 +5,7 @@
  * check passes on a correct result and fails on the untouched initial state.
  */
 import { execFile } from "node:child_process";
-import { readFile } from "node:fs/promises";
+import { readdir, readFile } from "node:fs/promises";
 import { join } from "node:path";
 import { fileURLToPath } from "node:url";
 import { promisify } from "node:util";
@@ -74,6 +74,30 @@ export const tasks: Task[] = [
         return { pass: false, detail: "`cartTotal` not found in both files" };
       }
       return { pass: true, detail: "tsc clean and rename complete" };
+    },
+  },
+  {
+    id: "multi-file-rename",
+    title: "Rename getUser → fetchUser across the whole project",
+    fixture: "multi-file-rename",
+    prompt:
+      "Rename the function `getUser` to `fetchUser` across the entire project — its definition in " +
+      "src/user.ts and every import and call site in the other files. `tsc --noEmit` must stay clean.",
+    check: async (dir) => {
+      const tsc = await tscPasses(dir);
+      if (!tsc.pass) return tsc;
+      const srcDir = join(dir, "src");
+      const files = (await readdir(srcDir, { recursive: true })).filter((f) => String(f).endsWith(".ts"));
+      let stale = 0;
+      let renamedDef = false;
+      for (const f of files) {
+        const text = await readFile(join(srcDir, String(f)), "utf8");
+        if (/\bgetUser\b/.test(text)) stale += 1;
+        if (/export function fetchUser\b/.test(text)) renamedDef = true;
+      }
+      if (stale > 0) return { pass: false, detail: `old name getUser still in ${stale} file(s)` };
+      if (!renamedDef) return { pass: false, detail: "fetchUser definition not found" };
+      return { pass: true, detail: `tsc clean and getUser renamed across ${files.length} files` };
     },
   },
 ];
