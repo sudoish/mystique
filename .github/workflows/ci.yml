@@ -1,0 +1,57 @@
+name: CI
+
+on:
+  push:
+    branches: [main, master]
+  pull_request:
+
+jobs:
+  extension:
+    name: Extension (typecheck + tests)
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: "22"
+          cache: npm
+          cache-dependency-path: extension/package-lock.json
+
+      # Neovim is needed for the integration test (it drives a headless instance).
+      - uses: rhysd/action-setup-vim@v1
+        with:
+          neovim: true
+          version: stable
+
+      - name: Install
+        working-directory: extension
+        run: npm ci
+
+      - name: Typecheck
+        working-directory: extension
+        run: npm run check
+
+      - name: Test
+        working-directory: extension
+        run: npm test
+
+  demo-tests:
+    name: Demo fixtures (jest TDD flow)
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: "22"
+          cache: npm
+          cache-dependency-path: demo-tests/package-lock.json
+
+      - name: Install
+        working-directory: demo-tests
+        run: npm ci
+
+      - name: Test
+        working-directory: demo-tests
+        run: npm test

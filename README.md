@@ -83,6 +83,7 @@ to run tests and read results — iterating red → green in your editor.
 |---|---|
 | `/nvim` | Connect: the host editor, `MYSTIQUE_SOCKET`, or a new herdr pane |
 | `/nvim-keymaps` | Show the cheat sheet of your mappings given to the agent |
+| `/nvim-capabilities` | Show the capability manifest (format/test/LSP/…) given to the agent |
 | `/nvim-speed demo\|fast` | Paced, watchable typing (default) or instant |
 | `/nvim-close` | Close a herdr-spawned Neovim, or detach from the host editor |
 
@@ -120,14 +121,29 @@ through `nvim_input`, the same path as real typing, so everything renders live.
 
 ## Roadmap
 
-- Inject a capability manifest into the agent prompt and demote keymaps to optional shortcuts
-  (see [CONFIG_AGNOSTIC_PLAN.md](CONFIG_AGNOSTIC_PLAN.md)).
 - Claude Code support via an MCP server + hooks (see [CLAUDE_CODE_PLAN.md](CLAUDE_CODE_PLAN.md)).
+- An evaluation suite comparing tokens and keystrokes against plain pi on representative tasks.
 
 ## Demo
 
 `demo/` is a tiny TypeScript project with two type errors and a project-local language server;
 `demo-tests/` is a Jest project used to exercise the test-driven flow.
+
+## Development
+
+From `extension/`:
+
+```bash
+npm install     # dependencies + dev tooling (TypeScript, tsx, pi types)
+npm run check   # strict type-check (tsc --noEmit)
+npm test        # unit tests + an integration test that drives a headless Neovim
+```
+
+`nvim.test.ts` unit-tests the pure helpers (e.g. the capability manifest renderer).
+`nvim.integration.test.ts` spawns a real `nvim --listen` and drives it through
+`NvimSession` end to end; it skips automatically when `nvim` isn't on `PATH`.
+CI (`.github/workflows/ci.yml`) runs the type-check, both test suites, and the
+`demo-tests` Jest flow on every push and pull request.
 
 ## License
 

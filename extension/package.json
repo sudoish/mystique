@@ -3,7 +3,10 @@
   "private": true,
   "version": "0.1.0",
   "type": "module",
-  "scripts": { "test": "tsx --test *.test.ts" },
+  "scripts": {
+    "check": "tsc --noEmit",
+    "test": "tsx --test *.test.ts"
+  },
   "pi": {
     "extensions": [
       "./index.ts"
@@ -13,6 +16,11 @@
     "neovim": "^5.5.0"
   },
   "devDependencies": {
-    "tsx": "^4.23.15"
+    "@earendil-works/pi-ai": "^1.4.0",
+    "@earendil-works/pi-coding-agent": "^1.4.0",
+    "@earendil-works/pi-tui": "^1.4.0",
+    "@types/node": "^22.20.5",
+    "tsx": "^4.23.15",
+    "typescript": "^5.9.3"
   }
 }
