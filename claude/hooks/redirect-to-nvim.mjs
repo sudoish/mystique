@@ -12,7 +12,7 @@ const MAP = {
   Edit: "nvim_keys / nvim_ex / nvim_insert, or nvim_lsp rename",
   Write: "nvim_ex `e <path>` then nvim_insert",
   Grep: "nvim_grep",
-  Glob: "nvim_grep (or nvim_ex `:find`/`:args`)",
+  Glob: "nvim_find (fuzzy file names) or nvim_grep",
   LS: "nvim_ex `:!ls` is fine, or just nvim_view a file",
   NotebookEdit: "the nvim_* editing tools",
 };

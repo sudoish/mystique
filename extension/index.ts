@@ -10,7 +10,8 @@ import { fileURLToPath } from "node:url";
 import { StringEnum, Type } from "@earendil-works/pi-ai";
 import { defineTool, type ExtensionAPI, type ExtensionContext } from "@earendil-works/pi-coding-agent";
 import { Text } from "@earendil-works/pi-tui";
-import { type Caps, detectMode, NvimSession, renderCapabilities, shellQuote, type Snapshot } from "../core/nvim.ts";
+import { type Caps, detectMode, NvimSession, renderCapabilities, type Snapshot } from "../core/nvim.ts";
+import { findRun, grepRun } from "../core/tools.ts";
 
 
 // Back-compat: the project used to be "pi-nvim-dev" with PI_NVIM_* env vars. Honor the old
@@ -82,7 +83,7 @@ function snapResult(s: Snapshot, opts: { extra?: string; notice?: string } = {})
   if (s.qf) out.push(`quickfix (${s.qf.total}):\n${s.qf.items.join("\n")}`);
   if (s.floats?.length) out.push(`floating windows:\n${s.floats.join("\n")}`);
   out.push(details.status!);
-  out.push(s.ctx);
+  if (s.ctx) out.push(s.ctx);
   if (s.bufs && s.bufs.length > 1) out.push(`buffers: ${s.bufs.join(" ")}`);
   return { content: [{ type: "text" as const, text: out.join("\n") }], details };
 }
@@ -281,37 +282,73 @@ const grepTool = defineTool({
   name: "nvim_grep",
   label: "nvim grep",
   description:
-    "Search the project with :grep (ripgrep, smart-case regex). Results fill the quickfix list, which opens visibly. " +
+    "Search the project with ripgrep (smart-case regex); scope with `path`. Returns hits grouped by file (or per-file counts when there are many); all hits fill the quickfix list, which opens visibly. " +
     "Follow up with `nvim_ex` commands like `cdo s/a/b/g | update`, `cfirst` or `cnext`.",
-  promptSnippet: "Project search via :grep into the quickfix list",
+  promptSnippet: "Project search (ripgrep) into the quickfix list",
   parameters: Type.Object({
     pattern: Type.String({ description: "ripgrep regex" }),
-    glob: Type.Optional(Type.String({ description: "Optional file glob, e.g. '*.ts' or 'src/**'" })),
+    path: Type.Optional(
+      Type.String({ description: "Directory or file to search, e.g. 'src' (keeps .gitignore in effect)" }),
+    ),
+    glob: Type.Optional(
+      Type.String({ description: "File filter, e.g. '*.ts'. Overrides .gitignore, so prefer path for scoping" }),
+    ),
+    limit: Type.Optional(Type.Number({ description: "Max hits listed line by line (default 40); above it you get per-file counts" })),
+    word: Type.Optional(Type.Boolean({ description: "Whole-word matches only (e.g. `id` won't match `userId`)" })),
+    literal: Type.Optional(Type.Boolean({ description: "Pattern is a literal string, not a regex (no escaping needed)" })),
+    case: Type.Optional(
+      StringEnum(["smart", "sensitive", "ignore"] as const, {
+        description: "Default smart: case-insensitive unless the pattern has uppercase",
+      }),
+    ),
+    context: Type.Optional(
+      Type.Number({ description: "Lines of context around each listed hit (0-5); saves a follow-up nvim_view" }),
+    ),
   }),
   executionMode: "sequential",
   renderCall: (args, theme) =>
     new Text(
       title(theme, "🔍", "grep") +
       theme.fg("accent", args.pattern ?? "") +
-      theme.fg("dim", args.glob ? `  ${args.glob}` : ""),
+      theme.fg("dim", [args.path, args.glob, args.word && "word", args.literal && "literal", args.case && args.case !== "smart" && args.case].filter(Boolean).map((s) => `  ${s}`).join("")),
       0,
       0,
     ),
   renderResult: renderNvimResult,
   async execute(_id, p, _signal, _onUpdate, ctx) {
     return withNvim(ctx, `grep ${trunc(p.pattern, 30)}`, false, async (notice) => {
-      const esc = (s: string) => shellQuote(s).replace(/[%#|]/g, (m) => `\\${m}`);
-      const cmd = `silent grep! ${esc(p.pattern)}${p.glob ? ` -g ${esc(p.glob)}` : ""}`;
-      await session.ex(cmd);
-      await session.lua(
-        "if #vim.fn.getqflist() > 0 then vim.cmd('botright copen 8') vim.cmd('wincmd p') else vim.cmd('cclose') end",
-      );
-      const snap = await session.snapshot({ qf: 50 });
-      delete snap.output; // the `:!rg … | tee` echo; quickfix carries the results
-      if (!snap.qf) snap.msg = "no matches";
-      const r = snapResult(snap, { notice });
-      r.details.summary = snap.qf ? `${snap.qf.total} match(es) in quickfix` : "no matches";
-      return r;
+      const r = await grepRun(session, p);
+      const summary = r.total ? `${r.total} match(es) in ${r.files} file(s), quickfix` : "no matches";
+      return plain(notice ? `${notice}\n${r.text}` : r.text, { notice, summary });
+    });
+  },
+});
+
+const findTool = defineTool({
+  name: "nvim_find",
+  label: "nvim find",
+  description:
+    "Find files by name: fuzzy-match a query against the project's file paths (rg --files, .gitignore applies), " +
+    "best matches first, like a picker's find_files. Then open one with `nvim_ex` `e <path>`.",
+  promptSnippet: "Fuzzy file-name search (find_files without the picker UI)",
+  parameters: Type.Object({
+    query: Type.String({ description: "Fuzzy query, e.g. 'tools', 'ext/index', 'nvimtest'" }),
+    path: Type.Optional(Type.String({ description: "Directory to search (default: project root)" })),
+    limit: Type.Optional(Type.Number({ description: "Max paths returned (default 20)" })),
+  }),
+  executionMode: "sequential",
+  renderCall: (args, theme) =>
+    new Text(
+      title(theme, "📄", "find") + theme.fg("accent", args.query ?? "") + theme.fg("dim", args.path ? `  ${args.path}` : ""),
+      0,
+      0,
+    ),
+  renderResult: renderNvimResult,
+  async execute(_id, p, _signal, _onUpdate, ctx) {
+    return withNvim(ctx, `find ${trunc(p.query, 30)}`, false, async (notice) => {
+      const r = await findRun(session, p);
+      const summary = r.total ? `${r.total} file(s)` : "no files";
+      return plain(notice ? `${notice}\n${r.text}` : r.text, { notice, summary });
     });
   },
 });
@@ -600,7 +637,7 @@ function saveCapabilities(caps: Caps) {
 }
 
 export default function(pi: ExtensionAPI) {
-  for (const t of [keysTool, exTool, insertTool, viewTool, grepTool, lspTool, checkTool, testsTool, screenTool, testTool, formatTool]) {
+  for (const t of [keysTool, exTool, insertTool, viewTool, grepTool, findTool, lspTool, checkTool, testsTool, screenTool, testTool, formatTool]) {
     pi.registerTool(t as any);
   }
 
@@ -647,7 +684,7 @@ export default function(pi: ExtensionAPI) {
         if (re.test(command)) {
           return {
             block: true,
-            reason: `Blocked (${what}). Read, search and edit through the nvim_* tools: nvim_view, nvim_grep, nvim_lsp, nvim_keys, nvim_ex, nvim_insert.`,
+            reason: `Blocked (${what}). Read, search and edit through the nvim_* tools: nvim_view, nvim_grep, nvim_find, nvim_lsp, nvim_keys, nvim_ex, nvim_insert.`,
           };
         }
       }

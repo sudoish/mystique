@@ -5,7 +5,7 @@
  */
 import assert from "node:assert/strict";
 import { execFileSync, spawn, type ChildProcess } from "node:child_process";
-import { existsSync, mkdtempSync, rmSync, writeFileSync } from "node:fs";
+import { existsSync, mkdirSync, mkdtempSync, rmSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { fileURLToPath } from "node:url";
@@ -18,6 +18,15 @@ import { createServer } from "./index.ts";
 function hasNvim(): boolean {
   try {
     execFileSync("nvim", ["--version"], { stdio: "ignore" });
+    return true;
+  } catch {
+    return false;
+  }
+}
+
+function hasRg(): boolean {
+  try {
+    execFileSync("rg", ["--version"], { stdio: "ignore" });
     return true;
   } catch {
     return false;
@@ -77,7 +86,7 @@ describe("mcp-nvim server over MCP", { skip: hasNvim() ? false : "nvim not insta
   test("lists the nvim_* tools", async () => {
     const { tools } = await client.listTools();
     const names = tools.map((t) => t.name).sort();
-    for (const n of ["nvim_keys", "nvim_ex", "nvim_view", "nvim_grep", "nvim_lsp", "nvim_format", "nvim_test"]) {
+    for (const n of ["nvim_keys", "nvim_ex", "nvim_view", "nvim_grep", "nvim_find", "nvim_lsp", "nvim_format", "nvim_test"]) {
       assert.ok(names.includes(n), `expected tool ${n}, got ${names.join(", ")}`);
     }
   });
@@ -99,5 +108,124 @@ describe("mcp-nvim server over MCP", { skip: hasNvim() ? false : "nvim not insta
     await client.callTool({ name: "nvim_ex", arguments: { cmd: "%s/greeting/salutation/g" } });
     const res = await client.callTool({ name: "nvim_view", arguments: {} });
     assert.match(textOf(res), /salutation/);
+  });
+
+  test("a rewrite with identical text (formatter on save) reports no change", async () => {
+    await client.callTool({ name: "nvim_ex", arguments: { cmd: "edit sample.ts" } });
+    const text = textOf(await client.callTool({ name: "nvim_ex", arguments: { cmd: "%s/e/e/g" } }));
+    assert.doesNotMatch(text, /changed/, text);
+  });
+
+  test("a real edit reports exactly the lines whose text changed", async () => {
+    writeFileSync(join(cwd, "multi.ts"), "one\ntwo\nthree\n");
+    await client.callTool({ name: "nvim_ex", arguments: { cmd: "edit multi.ts" } });
+    // Rewrites every line, but only line 2 ends up different.
+    const text = textOf(await client.callTool({ name: "nvim_ex", arguments: { cmd: "%s/$//e | 2s/$/ tail/" } }));
+    assert.match(text, /changed multi\.ts 2:\n 2│two tail\n/, text);
+    assert.doesNotMatch(text, /changed multi\.ts (1|3|1-3)/, text);
+  });
+
+  describe("nvim_grep", { skip: hasRg() ? false : "rg not installed" }, () => {
+    const grep = async (args: Record<string, unknown>) =>
+      textOf(await client.callTool({ name: "nvim_grep", arguments: args }));
+
+    before(() => {
+      mkdirSync(join(cwd, "src"), { recursive: true });
+      mkdirSync(join(cwd, "node_modules", "dep"), { recursive: true });
+      // rg honors .ignore even outside a git repo (the temp dir isn't one).
+      writeFileSync(join(cwd, ".ignore"), "node_modules/\n");
+      writeFileSync(
+        join(cwd, "src", "a.ts"),
+        [
+          "    const needle = 1; const needle2 = needle; // a|b 50% #tag",
+          `const long = "${"x".repeat(5000)} needle";`,
+          `const mid = "${"y".repeat(600)} needle";`,
+          "",
+        ].join("\n"),
+      );
+      writeFileSync(join(cwd, "src", "b.ts"), "export const needle = 'b';\n");
+      writeFileSync(join(cwd, "node_modules", "dep", "index.js"), "module.exports = 'needle';\n");
+    });
+
+    test("path scopes the search without un-ignoring node_modules", async () => {
+      const text = await grep({ pattern: "needle", path: "src" });
+      assert.match(text, /^4 matches in 2 files/);
+      assert.doesNotMatch(text, /node_modules/);
+    });
+
+    test("hits are grouped by file: path once, one `lnum:col text` per line", async () => {
+      await client.callTool({ name: "nvim_ex", arguments: { cmd: "edit sample.ts" } });
+      const text = await grep({ pattern: "needle", path: "src" });
+      assert.match(text, /^src\/a\.ts \(3\)\n {2}1:11 const needle = 1;/m); // indentation dropped
+      assert.match(text, /^src\/b\.ts\n {2}1:14 export const needle/m);
+      assert.equal(text.match(/^ {2}1:/gm)?.length, 2, text); // one entry per line, not per match
+      assert.doesNotMatch(text, /changed|quickfix \(/); // no echoed quickfix buffer or raw list
+      assert.doesNotMatch(text, /salutation|greeting/); // no unrelated cursor context
+    });
+
+    test("long lines are windowed around the match", async () => {
+      const text = await grep({ pattern: "needle", path: "src" });
+      for (const line of text.split("\n")) assert.ok(line.length < 200, `line of ${line.length} chars`);
+      assert.match(text, /3:\d+ …y+ needle";/);
+    });
+
+    test("over the limit it returns per-file counts instead of lines", async () => {
+      const text = await grep({ pattern: "needle", path: "src", limit: 2 });
+      assert.match(text, /^4 matches in 2 files\nover the 2-hit listing limit; hits per file:\n {2}3 src\/a\.ts\n {2}1 src\/b\.ts/);
+      assert.doesNotMatch(text, /const needle/);
+    });
+
+    test("regex and Ex-special characters pass through literally", async () => {
+      assert.match(await grep({ pattern: "zzz|needle2" }), /^src\/a\.ts\n {2}1:/m);
+      assert.match(await grep({ pattern: "50% #tag" }), /^src\/a\.ts\n {2}1:/m);
+      assert.match(await grep({ pattern: "a\\|b" }), /^src\/a\.ts\n {2}1:/m);
+    });
+
+    test("no matches is reported", async () => {
+      assert.match(await grep({ pattern: "definitely_not_here_42", path: "src" }), /^no matches for definitely_not_here_42 in src$/);
+    });
+
+    test("word matches whole words only", async () => {
+      assert.match(await grep({ pattern: "needl", path: "src" }), /^4 matches in 2 files/);
+      assert.match(await grep({ pattern: "needl", path: "src", word: true }), /^no matches/);
+    });
+
+    test("literal takes regex metacharacters at face value", async () => {
+      assert.match(await grep({ pattern: "a|b", path: "src", literal: true }), /^1 match in 1 file\nsrc\/a\.ts\n {2}1:/);
+    });
+
+    test("case: smart is sensitive with uppercase; ignore overrides", async () => {
+      assert.match(await grep({ pattern: "NEEDLE", path: "src" }), /^no matches/);
+      assert.match(await grep({ pattern: "NEEDLE", path: "src", case: "ignore" }), /^4 matches in 2 files/);
+      assert.match(await grep({ pattern: "Needle", path: "src", case: "sensitive" }), /^no matches/);
+    });
+
+    test("context shows surrounding lines rg-style, indentation kept", async () => {
+      const text = await grep({ pattern: "needle2", path: "src", context: 1 });
+      assert.match(text, /^src\/a\.ts\n {2}1:\d+ {5}const needle = 1;.*\n {2}2- const long = "x+…$/m, text);
+    });
+
+    test("a single file as path still yields file names", async () => {
+      assert.match(await grep({ pattern: "needle", path: "src/b.ts" }), /^1 match in 1 file\nsrc\/b\.ts\n {2}1:14 /);
+    });
+  });
+
+  describe("nvim_find", { skip: hasRg() ? false : "rg not installed" }, () => {
+    const find = async (args: Record<string, unknown>) =>
+      textOf(await client.callTool({ name: "nvim_find", arguments: args }));
+
+    test("fuzzy-ranks project files, best first, ignoring node_modules", async () => {
+      const text = await find({ query: "srca" });
+      assert.match(text, /^\d+ files? match srca.*:\nsrc\/a\.ts(\n|$)/, text);
+      assert.doesNotMatch(text, /node_modules/);
+    });
+
+    test("limit caps the list and says so", async () => {
+      assert.match(await find({ query: "ts", limit: 1 }), /^\d+ files match ts, top 1:\n[^\n]+$/);
+    });
+
+    test("no match is reported with the searched count", async () => {
+      assert.match(await find({ query: "zzzqqq" }), /^no files match zzzqqq \(\d+ searched\)$/);
+    });
   });
 });

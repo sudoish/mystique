@@ -123,13 +123,34 @@ export function createServer(session: NvimSession): McpServer {
   server.registerTool(
     "nvim_grep",
     {
-      description: "Search the project with :grep (ripgrep, smart-case). Results fill the quickfix list.",
+      description:
+        "Search the project with ripgrep (smart-case regex). Returns hits grouped by file, or per-file counts when there are many; all hits fill the quickfix list. Follow up with nvim_ex `cdo s/a/b/g | update`.",
       inputSchema: {
         pattern: z.string().describe("ripgrep regex"),
-        glob: z.string().optional().describe("Optional file glob, e.g. '*.ts'"),
+        path: z.string().optional().describe("Directory or file to search, e.g. 'src' (keeps .gitignore in effect)"),
+        glob: z.string().optional().describe("File filter, e.g. '*.ts'. Overrides .gitignore, so prefer path for scoping"),
+        limit: z.number().int().positive().optional().describe("Max hits listed line by line (default 40); above it you get per-file counts"),
+        word: z.boolean().optional().describe("Whole-word matches only (e.g. `id` won't match `userId`)"),
+        literal: z.boolean().optional().describe("Pattern is a literal string, not a regex (no escaping needed)"),
+        case: z.enum(["smart", "sensitive", "ignore"]).optional().describe("Default smart: case-insensitive unless the pattern has uppercase"),
+        context: z.number().int().min(0).max(5).optional().describe("Lines of context around each listed hit; saves a follow-up nvim_view"),
       },
     },
-    (a) => run("grep", false, () => tools.grep(session, a.pattern, a.glob)),
+    (a) => run("grep", false, () => tools.grep(session, a)),
+  );
+
+  server.registerTool(
+    "nvim_find",
+    {
+      description:
+        "Find files by name: fuzzy-match a query against the project's file paths (rg --files, .gitignore applies), best first, like a picker's find_files. Open one with nvim_ex `e <path>`.",
+      inputSchema: {
+        query: z.string().describe("Fuzzy query, e.g. 'tools', 'ext/index', 'nvimtest'"),
+        path: z.string().optional().describe("Directory to search (default: project root)"),
+        limit: z.number().int().positive().optional().describe("Max paths returned (default 20)"),
+      },
+    },
+    (a) => run("find", false, () => tools.find(session, a)),
   );
 
   server.registerTool(

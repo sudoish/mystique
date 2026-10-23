@@ -7,7 +7,7 @@ Neovim, the same way the pi extension does. The tool bodies come from
 
 ## Tools
 
-`nvim_keys`, `nvim_ex`, `nvim_insert`, `nvim_view`, `nvim_grep`, `nvim_lsp`,
+`nvim_keys`, `nvim_ex`, `nvim_insert`, `nvim_view`, `nvim_grep`, `nvim_find`, `nvim_lsp`,
 `nvim_check`, `nvim_tests`, `nvim_test`, `nvim_screen`, `nvim_format` — each returns
 the compact snapshot text (mode, file:line:col, cursor context, diagnostics, changed
 lines) the model reasons over.

@@ -15,6 +15,7 @@ M.user_changes = M.user_changes or {} -- edits made by the human between tool ca
 M.last_state = M.last_state or nil -- {buf, cursor, mode} when the last tool finished
 M.gen = (M.gen or 0) + 1 -- bumped on (re)load and detach: stale buffer listeners drop out
 M.attached = {}
+M.shadow = {} -- bufnr -> buffer text at the last change report (to drop no-op rewrites)
 
 local api, fn = vim.api, vim.fn
 
@@ -31,7 +32,7 @@ vim.o.more = false
 vim.o.confirm = false
 pcall(function()
   if vim.fn.executable("rg") == 1 then
-    vim.o.grepprg = "rg --vimgrep --smart-case --hidden --glob '!.git'"
+    vim.o.grepprg = "rg --line-number --column --no-heading --smart-case --hidden --glob '!.git' --max-columns 200 --max-columns-preview"
     vim.o.grepformat = "%f:%l:%c:%m"
   end
 end)
@@ -45,10 +46,48 @@ end
 -- Change tracking
 ---------------------------------------------------------------------------
 function M.on_lines(b, first, last_new)
+  -- Quickfix/help/terminal buffers get their buftype after BufEnter attached us; their lines aren't edits.
+  if vim.bo[b].buftype ~= "" then return end
   local store = M.busy and M.changes or M.user_changes
   local list = store[b] or {}
   store[b] = list
   list[#list + 1] = { first + 1, math.max(first + 1, last_new) }
+end
+
+local function buf_text(buf)
+  return table.concat(api.nvim_buf_get_lines(buf, 0, -1, false), "\n") .. "\n"
+end
+
+-- Re-baseline a buffer without reporting (its pending edits were dropped on purpose).
+local function resync(buf)
+  if M.shadow[buf] and api.nvim_buf_is_valid(buf) then M.shadow[buf] = buf_text(buf) end
+end
+
+local text_diff = (vim.text and vim.text.diff) or vim.diff
+
+-- Line ranges (in the current buffer) whose text really differs from the last report, or nil when
+-- there is no baseline. on_lines also fires for rewrites with identical text: formatters on save,
+-- plugins that reset whole blocks. Those used to show up as `changed` and cost tokens every call.
+local function real_changes(buf)
+  local old = M.shadow[buf]
+  if not old then return nil end
+  local new = buf_text(buf)
+  M.shadow[buf] = new
+  if old == new then return {} end
+  local ok, hunks = pcall(text_diff, old, new, { result_type = "indices" })
+  if not ok or type(hunks) ~= "table" then return nil end
+  local n = math.max(1, api.nvim_buf_line_count(buf))
+  local out = {}
+  for _, h in ipairs(hunks) do
+    local start, count = h[3], h[4]
+    if count > 0 then
+      out[#out + 1] = { start, start + count - 1 }
+    else -- pure deletion: point at the line just before the gap
+      local l = math.min(math.max(1, start), n)
+      out[#out + 1] = { l, l }
+    end
+  end
+  return out
 end
 
 local function track(buf)
@@ -63,9 +102,10 @@ local function track(buf)
       _G.Mystique.on_lines(b, first, last_new)
     end,
     on_detach = function(_, b)
-      M.attached[b] = nil
+      M.attached[b], M.shadow[b] = nil, nil
     end,
   })
+  M.shadow[buf] = buf_text(buf)
 end
 
 local group = api.nvim_create_augroup("Mystique", { clear = true })
@@ -109,7 +149,7 @@ local function take_changes(max_lines, store)
   local result, budget = {}, max_lines or 30
   for buf, ranges in pairs(store) do
     if api.nvim_buf_is_valid(buf) and #ranges > 0 then
-      local merged = merge(ranges, math.max(1, api.nvim_buf_line_count(buf)))
+      local merged = real_changes(buf) or merge(ranges, math.max(1, api.nvim_buf_line_count(buf)))
       local entry = { file = rel(api.nvim_buf_get_name(buf)), ranges = merged }
       local total = 0
       for _, r in ipairs(merged) do total = total + (r[2] - r[1] + 1) end
@@ -119,7 +159,7 @@ local function take_changes(max_lines, store)
         entry.text = table.concat(parts, "\n…\n")
         budget = budget - total
       end
-      result[#result + 1] = entry
+      if #merged > 0 then result[#result + 1] = entry end -- nothing really changed: say nothing
     end
   end
   for k in pairs(store) do store[k] = nil end
@@ -221,7 +261,7 @@ function M.detach()
   M.status(nil)
   M.end_run()
   M.gen = M.gen + 1
-  M.attached = {}
+  M.attached, M.shadow = {}, {}
   pcall(api.nvim_del_augroup_by_name, "Mystique")
   for k, v in pairs(M.saved_opts) do vim.o[k] = v end
   M.last_state = nil
@@ -260,7 +300,10 @@ function M.start_tool(label)
     end
     if #notes > 0 then activity = table.concat(notes, "\n") end
   else
-    for k in pairs(M.user_changes) do M.user_changes[k] = nil end
+    for k in pairs(M.user_changes) do
+      M.user_changes[k] = nil
+      resync(k) -- the human's edits are dropped unreported; don't attribute them to the next tool
+    end
   end
   M.busy = true
   M.status(label)
@@ -721,6 +764,12 @@ function M.view(path, first, last)
   }
 end
 
+-- Long lines (minified bundles, lockfiles) would flood results; keep a readable prefix.
+local function clip(s, n)
+  n = n or 160
+  return #s > n and (s:sub(1, n) .. "…") or s
+end
+
 function M.qflist(max)
   max = max or 50
   local items = fn.getqflist()
@@ -731,9 +780,177 @@ function M.qflist(max)
       break
     end
     local name = it.bufnr > 0 and rel(api.nvim_buf_get_name(it.bufnr)) or ""
-    out[#out + 1] = string.format("%s:%d:%d: %s", name, it.lnum, it.col, vim.trim(it.text or ""))
+    out[#out + 1] = string.format("%s:%d:%d: %s", name, it.lnum, it.col, clip(vim.trim(it.text or "")))
   end
   return { total = #items, items = out }
+end
+
+-- A window of `width` bytes around the match column (UTF-8 aligned), so a hit deep in a long line
+-- stays visible. Indentation and trailing space are dropped: they carry no signal, only tokens.
+local utf_start = vim.str_utf_start or function() return 0 end
+local utf_end = vim.str_utf_end or function() return 0 end
+local function around(text, col, width, keep_indent)
+  width = width or 120
+  local lead = keep_indent and 0 or #text:match("^%s*")
+  text = (text:sub(lead + 1):gsub("%s+$", ""))
+  if #text <= width then return text end
+  col = math.max(1, (col or 1) - lead)
+  local s = math.max(1, math.min(col - 30, #text - width + 1))
+  s = s + utf_start(text, s)
+  local e = math.min(#text, s + width - 1)
+  e = e + utf_end(text, e)
+  return (s > 1 and "…" or "") .. text:sub(s, e) .. (e < #text and "…" or "")
+end
+
+-- Hits plus `ctx` lines around each, rg-style: `12:5 hit` for matches, `11- text` for context,
+-- `--` between separate blocks. Read from disk, the same text rg searched. Indentation is kept
+-- here because the point of context is to see the structure. Saves a follow-up nvim_view.
+local function with_context(out, name, hits, ctx)
+  local ok, lines = pcall(fn.readfile, name)
+  if not ok then lines = {} end
+  local hit_at, blocks = {}, {}
+  for _, it in ipairs(hits) do
+    hit_at[it.lnum] = it
+    local a = math.max(1, it.lnum - ctx)
+    local b = math.max(it.lnum, math.min(#lines, it.lnum + ctx))
+    local last = blocks[#blocks]
+    if last and a <= last[2] + 1 then
+      last[2] = math.max(last[2], b)
+    else
+      blocks[#blocks + 1] = { a, b }
+    end
+  end
+  for i, blk in ipairs(blocks) do
+    if i > 1 then out[#out + 1] = "  --" end
+    for l = blk[1], blk[2] do
+      local it = hit_at[l]
+      if it then
+        out[#out + 1] = ("  %d:%d %s"):format(l, it.col, around(it.text or "", it.col, 120, true))
+      else
+        out[#out + 1] = (("  %d- %s"):format(l, around(lines[l] or "", 1, 120, true)):gsub("%s+$", ""))
+      end
+    end
+  end
+end
+
+-- Compact grep result for the model. Up to `limit` hits: grouped by file (path printed once),
+-- `lnum:col text` per hit. Beyond that: per-file counts, busiest first, so the agent narrows
+-- the search instead of paying for hundreds of lines. Quickfix always holds every hit.
+local function grep_report(items, limit, context)
+  local files, order = {}, {}
+  for _, it in ipairs(items) do
+    local name = it.filename or (it.bufnr and it.bufnr > 0 and rel(api.nvim_buf_get_name(it.bufnr))) or "?"
+    if not files[name] then
+      files[name] = {}
+      order[#order + 1] = name
+    end
+    table.insert(files[name], it)
+  end
+  local total, out = #items, {}
+  if total == 0 then return { total = 0, files = 0, text = "" } end
+  if total <= limit then
+    table.sort(order) -- rg prints files in thread order; keep results stable
+    for _, name in ipairs(order) do
+      local hits = files[name]
+      out[#out + 1] = #hits > 1 and ("%s (%d)"):format(name, #hits) or name
+      if context > 0 then
+        with_context(out, name, hits, context)
+      else
+        for _, it in ipairs(hits) do
+          out[#out + 1] = ("  %d:%d %s"):format(it.lnum, it.col, around(it.text or "", it.col))
+        end
+      end
+    end
+  else
+    table.sort(order, function(a, b)
+      if #files[a] ~= #files[b] then return #files[a] > #files[b] end
+      return a < b
+    end)
+    out[#out + 1] = ("over the %d-hit listing limit; hits per file:"):format(limit)
+    local maxf = 25
+    for i, name in ipairs(order) do
+      if i > maxf then
+        out[#out + 1] = ("  …(%d more files)"):format(#order - maxf)
+        break
+      end
+      out[#out + 1] = ("  %d %s"):format(#files[name], name)
+    end
+    out[#out + 1] = "All hits are in quickfix (cdo/cfirst work). Narrow with path, glob or a tighter pattern, or raise limit."
+  end
+  return { total = total, files = #order, text = table.concat(out, "\n") }
+end
+
+-- Project search. ripgrep runs from an argv (no shell or Ex parsing, so `|`, `%`, `#` and quotes are
+-- literal) and its hits are loaded into quickfix. `path` scopes by directory, so .gitignore still
+-- applies; a `--glob` filter overrides ignore rules (it can pull node_modules back in).
+-- One entry per matching line (not per match like --vimgrep); rg keeps only a 1000-byte
+-- preview of longer lines (minified bundles), and grep_report windows the rest around the match.
+function M.grep(pattern, opts)
+  opts = opts or {}
+  local path = opts.path ~= "" and opts.path or nil
+  local glob = opts.glob ~= "" and opts.glob or nil
+  local items = {}
+  if fn.executable("rg") == 1 then
+    local cmd = { "rg", "--with-filename", "--line-number", "--column", "--no-heading", "--color=never", "--hidden",
+      "--glob", "!.git", "--max-columns", "1000", "--max-columns-preview" }
+    if glob then vim.list_extend(cmd, { "--glob", glob }) end
+    local case = { sensitive = "--case-sensitive", ignore = "--ignore-case" }
+    cmd[#cmd + 1] = case[opts.case] or "--smart-case"
+    if opts.word then cmd[#cmd + 1] = "--word-regexp" end
+    if opts.literal then cmd[#cmd + 1] = "--fixed-strings" end
+    vim.list_extend(cmd, { "-e", pattern, "--" })
+    if path then cmd[#cmd + 1] = path end
+    local r = vim.system(cmd, { text = true, cwd = fn.getcwd() }):wait(30000)
+    local out = r.stdout or ""
+    -- 1 = no matches; 2 = error, but rg still prints what it found (e.g. one unreadable file).
+    if r.code ~= 0 and r.code ~= 1 and out == "" then
+      error(("rg failed (%s): %s"):format(r.code, vim.trim(r.stderr or "")), 0)
+    end
+    for line in out:gmatch("[^\n]+") do
+      local f, l, c, t = line:match("^(.-):(%d+):(%d+):(.*)$")
+      if f then items[#items + 1] = { filename = f, lnum = tonumber(l), col = tonumber(c), text = t } end
+    end
+    fn.setqflist({}, " ", { title = "rg " .. pattern, items = items })
+  else
+    local args = { fn.shellescape(pattern) }
+    if path then args[#args + 1] = fn.shellescape(path) end
+    pcall(vim.cmd.grep, { args = args, bang = true, mods = { silent = true } })
+    items = fn.getqflist()
+  end
+  if #items > 0 then
+    vim.cmd("botright copen 8")
+    vim.cmd("wincmd p")
+  else
+    vim.cmd("cclose")
+  end
+  return grep_report(items, tonumber(opts.limit) or 40, math.min(tonumber(opts.context) or 0, 5))
+end
+
+-- Find files by name: the project's files (rg --files, so .gitignore applies) ranked by
+-- vim.fn.matchfuzzy, the fuzzy matching a picker (find_files) does, without the floating UI.
+-- The agent gets the top `limit` paths, best first, and can `:e` the one it wants.
+function M.find(query, opts)
+  opts = opts or {}
+  local path = opts.path ~= "" and opts.path or nil
+  local limit = math.max(1, tonumber(opts.limit) or 20)
+  local files
+  if fn.executable("rg") == 1 then
+    local cmd = { "rg", "--files", "--hidden", "--glob", "!.git" }
+    if path then cmd[#cmd + 1] = path end
+    local r = vim.system(cmd, { text = true, cwd = fn.getcwd() }):wait(30000)
+    if r.code ~= 0 and r.code ~= 1 and (r.stdout or "") == "" then
+      error(("rg --files failed (%s): %s"):format(r.code, vim.trim(r.stderr or "")), 0)
+    end
+    files = vim.split(r.stdout or "", "\n", { trimempty = true })
+  else
+    files = vim.tbl_filter(function(f) return fn.isdirectory(f) == 0 end,
+      fn.globpath(path or ".", "**/*", false, true))
+    files = vim.tbl_map(function(f) return (f:gsub("^%./", "")) end, files)
+  end
+  local matches = query ~= "" and fn.matchfuzzy(files, query) or files
+  local shown = {}
+  for i = 1, math.min(limit, #matches) do shown[i] = matches[i] end
+  return { total = #matches, searched = #files, items = shown }
 end
 
 ---------------------------------------------------------------------------

@@ -105,7 +105,7 @@ to run tests and read results — iterating red → green in your editor.
 
 The agent edits through these instead of the built-in file tools:
 
-`nvim_keys`, `nvim_ex`, `nvim_insert`, `nvim_view`, `nvim_grep`, `nvim_lsp`, `nvim_format`, `nvim_test`,
+`nvim_keys`, `nvim_ex`, `nvim_insert`, `nvim_view`, `nvim_grep`, `nvim_find`, `nvim_lsp`, `nvim_format`, `nvim_test`,
 `nvim_tests`, `nvim_check`, `nvim_screen`.
 
 While Mystique is active, the built-in `read`/`edit`/`write`/`grep`/`find`/`ls` tools are disabled, and bash

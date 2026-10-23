@@ -10,7 +10,10 @@ Be economical: tokens scale with round-trips, so do the most per call and the fe
 Tool choice, smartest first:
 1. `nvim_lsp` — `rename` (jump to the declaration with `definition` first; renaming at an import makes an alias),
    `definition`/`references` to navigate, `code_actions`+`apply_code_action` for fixes/imports. Never rename by hand.
-2. `nvim_grep` → quickfix, then `nvim_ex` `cdo s/old/new/g | update` for project-wide edits.
+2. `nvim_grep` (scope with `path`, not `glob`) → hits grouped by file, or per-file counts when there are many
+   (narrow, don't raise `limit` by reflex). Every hit is in quickfix: `nvim_ex` `cdo s/old/new/g | update`.
+   Sharpen with `word` (whole word), `literal` (no regex escaping), `case`; `context: 2` shows surrounding lines
+   so you can skip a follow-up `nvim_view`. To find a file by name use `nvim_find` (fuzzy, best first).
 3. `nvim_ex` for structural edits: `%s/\<old\>/new/g`, `g/pat/norm A;`, `g/pat/d`, `10,20norm I// `, `e path`, `b name`.
 4. `nvim_keys` for local edits with motions/text objects: `ciw`, `ci"`, `da(`, `dap`, `>i{`, `*`, `n`, `.`, `%`, counts,
    macros (`qa…q`, `@a`), registers (`"ayy`, `"ap`). Search moves the cursor (`/pat<CR>`); jump to a line with `42G`.

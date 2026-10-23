@@ -32,6 +32,6 @@ export function classifyBash(command) {
 export function blockMessage(what) {
   return (
     `Blocked (${what}). Read, search and edit through the nvim_* MCP tools: ` +
-    "nvim_view, nvim_grep, nvim_lsp, nvim_keys, nvim_ex, nvim_insert."
+    "nvim_view, nvim_grep, nvim_find, nvim_lsp, nvim_keys, nvim_ex, nvim_insert."
   );
 }
