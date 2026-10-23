@@ -1,0 +1,64 @@
+eval/README.md
+  h_8a472ace01776f 37
+eval/fixtures/find-and-fix/initial/.ignore
+  h_8a472ace01776f 1
+eval/fixtures/find-and-fix/initial/src/config/limits.ts
+  h_8a472ace01776f 1-4
+eval/fixtures/find-and-fix/initial/src/index.ts
+  h_8a472ace01776f 1-4
+eval/fixtures/find-and-fix/initial/src/lib/http.ts
+  h_8a472ace01776f 1-6
+eval/fixtures/find-and-fix/initial/src/lib/retry.ts
+  h_8a472ace01776f 1-12
+eval/fixtures/find-and-fix/initial/src/services/billing.ts
+  h_8a472ace01776f 1-13
+eval/fixtures/find-and-fix/initial/src/services/orders.ts
+  h_8a472ace01776f 1-16
+eval/fixtures/find-and-fix/initial/src/services/search.ts
+  h_8a472ace01776f 1-10
+eval/fixtures/find-and-fix/initial/src/services/users.ts
+  h_8a472ace01776f 1-11
+eval/fixtures/find-and-fix/initial/tsconfig.json
+  h_8a472ace01776f 1-10
+eval/fixtures/find-and-fix/initial/vendor/retry-kit.min.js
+  h_8a472ace01776f 1
+eval/fixtures/find-and-fix/initial/vendor/retry-kit/README.md
+  h_8a472ace01776f 1-62
+eval/fixtures/find-and-fix/solution/.ignore
+  h_8a472ace01776f 1
+eval/fixtures/find-and-fix/solution/src/config/limits.ts
+  h_8a472ace01776f 1-4
+eval/fixtures/find-and-fix/solution/src/index.ts
+  h_8a472ace01776f 1-4
+eval/fixtures/find-and-fix/solution/src/lib/http.ts
+  h_8a472ace01776f 1-6
+eval/fixtures/find-and-fix/solution/src/lib/retry.ts
+  h_8a472ace01776f 1-12
+eval/fixtures/find-and-fix/solution/src/services/billing.ts
+  h_8a472ace01776f 1-14
+eval/fixtures/find-and-fix/solution/src/services/orders.ts
+  h_8a472ace01776f 1-16
+eval/fixtures/find-and-fix/solution/src/services/search.ts
+  h_8a472ace01776f 1-10
+eval/fixtures/find-and-fix/solution/src/services/users.ts
+  h_8a472ace01776f 1-12
+eval/fixtures/find-and-fix/solution/tsconfig.json
+  h_8a472ace01776f 1-10
+eval/fixtures/find-and-fix/solution/vendor/retry-kit.min.js
+  h_8a472ace01776f 1
+eval/fixtures/find-and-fix/solution/vendor/retry-kit/README.md
+  h_8a472ace01776f 1-62
+eval/src/tasks.ts
+  h_8a472ace01776f 131-171
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.7.5",
+  "base_commit_sha": "b20925c27fec5e20f10102bdd04bb8c8f351ffea",
+  "prompts": {},
+  "humans": {
+    "h_8a472ace01776f": {
+      "author": "Thiago Pacheco <hi@sudoish.com>"
+    }
+  }
+}
