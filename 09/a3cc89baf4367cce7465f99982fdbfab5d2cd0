@@ -1,0 +1,27 @@
+eval/fixtures/tdd-loop/solution/classify.mjs
+  s_1b069e4f66bbbb::t_9ffb677d76dd38 1-6
+eval/fixtures/tdd-loop/solution/classify.test.mjs
+  s_1b069e4f66bbbb::t_9ffb677d76dd38 1-16
+eval/fixtures/tdd-loop/initial/classify.mjs
+  s_1b069e4f66bbbb::t_abae22f3db2e82 1-5
+eval/fixtures/tdd-loop/initial/classify.test.mjs
+  s_1b069e4f66bbbb::t_559d1bbd89f28b 1-16
+eval/src/report.ts
+  s_1b069e4f66bbbb::t_248777d6a4e5a3 61-62,70
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.7.5",
+  "base_commit_sha": "09a3cc89baf4367cce7465f99982fdbfab5d2cd0",
+  "prompts": {},
+  "sessions": {
+    "s_1b069e4f66bbbb": {
+      "agent_id": {
+        "tool": "pi",
+        "id": "01a16474-ac4b-771f-b7e3-92fb8cb757dc",
+        "model": "claude-opus-4-8"
+      },
+      "human_author": "Thiago Pacheco <hi@sudoish.com>"
+    }
+  }
+}
