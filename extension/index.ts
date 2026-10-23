@@ -10,7 +10,7 @@ import { fileURLToPath } from "node:url";
 import { StringEnum, Type } from "@earendil-works/pi-ai";
 import { defineTool, type ExtensionAPI, type ExtensionContext } from "@earendil-works/pi-coding-agent";
 import { Text } from "@earendil-works/pi-tui";
-import { type Caps, detectMode, NvimSession, renderCapabilities, shellQuote, type Snapshot } from "./nvim.ts";
+import { type Caps, detectMode, NvimSession, renderCapabilities, shellQuote, type Snapshot } from "../core/nvim.ts";
 
 
 // Back-compat: the project used to be "pi-nvim-dev" with PI_NVIM_* env vars. Honor the old
@@ -22,8 +22,8 @@ for (const k of ["SOCKET", "SPEED", "POLICY", "CLOSE", "REFOCUS", "AUTOSTART", "
   }
 }
 const here = dirname(fileURLToPath(import.meta.url));
-const session = new NvimSession(join(here, "lua", "mystique.lua"));
-const playbook = readFileSync(join(here, "prompt.md"), "utf8");
+const session = new NvimSession(join(here, "..", "core", "lua", "mystique.lua"));
+const playbook = readFileSync(join(here, "..", "core", "prompt.md"), "utf8");
 const cacheFile = join(homedir(), ".cache", "mystique", "keymaps.txt");
 const capFile = join(homedir(), ".cache", "mystique", "capabilities.json");
 

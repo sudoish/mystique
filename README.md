@@ -39,7 +39,7 @@ installed copy never cripples plain pi.
 
 ```bash
 git clone https://github.com/<you>/mystique.git ~/dev/mystique
-cd ~/dev/mystique/extension && npm install
+cd ~/dev/mystique/core && npm install && cd ../extension && npm install
 ```
 
 Load it for a single pi run:
@@ -115,7 +115,7 @@ before every allowed bash call.
 ## How it works
 
 Mystique attaches to Neovim over msgpack-RPC (the official `neovim` npm client) and loads a small Lua helper
-(`extension/lua/mystique.lua`) that exposes `_G.Mystique`: compact state snapshots, changed-line tracking, a
+(`core/lua/mystique.lua`) that exposes `_G.Mystique`: compact state snapshots, changed-line tracking, a
 human-activity guard, LSP helpers, capability discovery, format/test verbs and screen capture. Keystrokes go
 through `nvim_input`, the same path as real typing, so everything renders live.
 
@@ -130,22 +130,25 @@ through `nvim_input`, the same path as real typing, so everything renders live.
 `demo-tests/` is a Jest project used to exercise the test-driven flow.
 `eval/` is the [evaluation harness](eval/README.md) that A/B-compares Mystique against plain pi (tokens, tool calls, success) on these fixtures.
 
+## Layout
+
+- `core/` — harness-agnostic engine (no pi SDK imports): the `NvimSession` RPC
+  driver, the `mystique.lua` helper, the `Snapshot` protocol, capability
+  rendering and the power-user playbook (`prompt.md`). Shared by the pi extension
+  and (planned) an MCP server for other agents.
+- `extension/` — the pi adapter: `defineTool` wrappers, TUI renderers, policy
+  guards and slash commands. Imports `../core`.
+- `eval/` — the A/B evaluation harness. `demo/`, `demo-tests/` — fixtures.
+
 ## Development
 
-From `extension/`:
-
 ```bash
-npm install     # dependencies + dev tooling (TypeScript, tsx, pi types)
-npm run check   # strict type-check (tsc --noEmit)
-npm test        # unit tests + an integration test that drives a headless Neovim
+cd core && npm install && npm run check && npm test   # engine + its tests (needs nvim for the integration test)
+cd ../extension && npm install && npm run check        # pi adapter typecheck (resolves neovim via ../core)
 ```
 
-`nvim.test.ts` unit-tests the pure helpers (e.g. the capability manifest renderer).
-`nvim.integration.test.ts` spawns a real `nvim --listen` and drives it through
-`NvimSession` end to end; it skips automatically when `nvim` isn't on `PATH`.
-CI (`.github/workflows/ci.yml`) type-checks and tests the extension (with Neovim for the
-integration test), the `eval/` harness, and the `demo-tests` Jest flow on every push and PR.
-
-## License
-
-MIT — see [LICENSE](LICENSE).
+`core/nvim.test.ts` unit-tests the pure helpers (e.g. the capability manifest
+renderer); `core/nvim.integration.test.ts` spawns a real `nvim --listen` and drives
+it through `NvimSession` end to end (skips when `nvim` isn't on `PATH`). CI
+(`.github/workflows/ci.yml`) runs core, the extension typecheck, the `eval/`
+harness and the `demo-tests` Jest flow on every push and PR.

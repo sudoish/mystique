@@ -6,8 +6,8 @@ on:
   pull_request:
 
 jobs:
-  extension:
-    name: Extension (typecheck + tests)
+  core:
+    name: Core (typecheck + tests)
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
@@ -16,7 +16,7 @@ jobs:
         with:
           node-version: "22"
           cache: npm
-          cache-dependency-path: extension/package-lock.json
+          cache-dependency-path: core/package-lock.json
 
       # Neovim is needed for the integration test (it drives a headless instance).
       # Download the official stable tarball directly — the setup-vim action trips over
@@ -31,16 +31,41 @@ jobs:
         run: nvim --version | head -1
 
       - name: Install
+        working-directory: core
+        run: npm ci
+
+      - name: Typecheck
+        working-directory: core
+        run: npm run check
+
+      - name: Test
+        working-directory: core
+        run: npm test
+
+  extension:
+    name: Extension (typecheck)
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: "22"
+          cache: npm
+          cache-dependency-path: extension/package-lock.json
+
+      # The extension imports ../core, whose nvim.ts imports `neovim`; install core so tsc resolves it.
+      - name: Install core
+        working-directory: core
+        run: npm ci
+
+      - name: Install
         working-directory: extension
         run: npm ci
 
       - name: Typecheck
         working-directory: extension
         run: npm run check
-
-      - name: Test
-        working-directory: extension
-        run: npm test
 
   demo-tests:
     name: Demo fixtures (jest TDD flow)

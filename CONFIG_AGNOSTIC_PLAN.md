@@ -83,4 +83,4 @@ These replace the prompt's `<leader>fm` / `<leader>tt` instructions.
 2. (done) `format` verb (conform -> LSP -> gq) wired as `nvim_format`; the format keymap dropped from prompt.
 3. (done) `test_run` verb (neotest, else vim-test) wired as `nvim_test` (runs + waits); the test keymaps dropped from prompt.
 4. (done) Prompt rewrite; keymaps demoted to optional.
-5. (done) Validated on this config *and* a stock `nvim -u NONE`-ish config. Headless `nvim -u NONE` returns the degraded manifest (format=builtin, test=none, lsp=none, treesitter=no); `renderCapabilities` covers both in `extension/nvim.test.ts` (`npm test`).
+5. (done) Validated on this config *and* a stock `nvim -u NONE`-ish config. Headless `nvim -u NONE` returns the degraded manifest (format=builtin, test=none, lsp=none, treesitter=no); `renderCapabilities` covers both in `core/nvim.test.ts` (`npm test`).

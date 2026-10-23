@@ -12,7 +12,7 @@ model away from `Read`/`Edit`/`Write`.
 
 ## What is already portable (harness-agnostic)
 
-From `extension/nvim.ts` — none of this imports the pi SDK:
+Now extracted into `core/` (milestone 1 done) — none of it imports the pi SDK:
 
 - `detectMode()` — picks embedded (`$NVIM`) / external (`PI_NVIM_SOCKET`) / herdr.
 - `NvimSession` — attaches the `neovim` npm client over the unix socket, runs
@@ -85,7 +85,7 @@ Claude Code has no API to delete `Read`/`Edit`/`Write`. Two layers:
   Code version before committing to the approach.
 
 ## Milestones
-1. `core/` extracted; pi extension still green against it.
+1. (done) `core/` extracted; pi extension still green against it. — core/ is a pi-free package (NvimSession, mystique.lua, prompt.md, Snapshot, capability rendering + tests); extension imports ../core and stays green (typecheck + runtime verified).
 2. `mcp-nvim` server driving Neovim end to end (manual test, no guard).
 3. Permissions + PreToolUse hooks enforcing editor-only edits.
 4. `CLAUDE.md` playbook + keymaps; run the shipping/fibonacci TDD flow in Claude Code.
