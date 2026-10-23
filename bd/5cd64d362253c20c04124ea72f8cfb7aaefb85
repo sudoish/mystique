@@ -1,0 +1,61 @@
+eval/fixtures/multi-file-rename/solution/tsconfig.json
+  s_1b069e4f66bbbb::t_83713f5e0bdbe2 1-10
+eval/fixtures/multi-file-rename/initial/tsconfig.json
+  s_1b069e4f66bbbb::t_f908c1bbada6b7 1-10
+eval/fixtures/multi-file-rename/solution/src/index.ts
+  s_1b069e4f66bbbb::t_83713f5e0bdbe2 2-6,8
+  s_2ac552630ed333::t_99f3e2dc9cb1c9 1,7
+eval/fixtures/multi-file-rename/solution/src/c.ts
+  s_1b069e4f66bbbb::t_83713f5e0bdbe2 2-3,5
+  s_2ac552630ed333::t_fdee6173915fc7 1,4
+eval/fixtures/multi-file-rename/solution/src/a.ts
+  s_1b069e4f66bbbb::t_83713f5e0bdbe2 2-3,5-6
+  s_2ac552630ed333::t_9773d611a71fe1 1,4
+eval/fixtures/multi-file-rename/solution/src/d.ts
+  s_1b069e4f66bbbb::t_83713f5e0bdbe2 2-3,5
+  s_2ac552630ed333::t_da30e39dd9ad82 1,4
+eval/fixtures/multi-file-rename/solution/src/b.ts
+  s_1b069e4f66bbbb::t_83713f5e0bdbe2 2-3,5
+  s_2ac552630ed333::t_9581f2209ca9bd 1,4
+eval/fixtures/multi-file-rename/solution/src/user.ts
+  s_1b069e4f66bbbb::t_83713f5e0bdbe2 1-10,12-13
+  s_2ac552630ed333::t_94246ca2c36e86 11
+eval/fixtures/multi-file-rename/initial/src/a.ts
+  s_2ac552630ed333::t_8169bbe570b8b3 1-6
+eval/fixtures/multi-file-rename/initial/src/b.ts
+  s_2ac552630ed333::t_fc87535964c277 1-5
+eval/fixtures/multi-file-rename/initial/src/c.ts
+  s_2ac552630ed333::t_72461a25a0bda9 1-5
+eval/fixtures/multi-file-rename/initial/src/d.ts
+  s_2ac552630ed333::t_538b27ea634679 1-5
+eval/fixtures/multi-file-rename/initial/src/index.ts
+  s_2ac552630ed333::t_758658bfff2d48 1-8
+eval/fixtures/multi-file-rename/initial/src/user.ts
+  s_2ac552630ed333::t_bf74a31a68d17e 1-13
+eval/src/tasks.ts
+  s_2ac552630ed333::t_84a9dbd5ce5edc 8,79-102
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.7.5",
+  "base_commit_sha": "bd5cd64d362253c20c04124ea72f8cfb7aaefb85",
+  "prompts": {},
+  "sessions": {
+    "s_1b069e4f66bbbb": {
+      "agent_id": {
+        "tool": "pi",
+        "id": "01a16474-ac4b-771f-b7e3-92fb8cb757dc",
+        "model": "claude-opus-4-8"
+      },
+      "human_author": "Thiago Pacheco <hi@sudoish.com>"
+    },
+    "s_2ac552630ed333": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "389a3850-d20e-4d9e-91ec-435347894953",
+        "model": "claude-fable-5-1"
+      },
+      "human_author": "Thiago Pacheco <hi@sudoish.com>"
+    }
+  }
+}
