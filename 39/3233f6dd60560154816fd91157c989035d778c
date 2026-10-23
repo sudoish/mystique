@@ -1,0 +1,38 @@
+core/lua/mystique.lua
+  s_e94f11859d390a::t_509ec6626e3570 18,35,49-50,57-92,105,108,152,162,264,303-306,767-772,783,788-954
+  s_e94f11859d390a::t_4a350ef0b09eba 955
+README.md
+  s_e94f11859d390a::t_989e3404913dd0 108
+claude/CLAUDE.md
+  s_e94f11859d390a::t_903b39d7f04776 19-22
+claude/hooks/bash-policy.mjs
+  s_e94f11859d390a::t_890ad58adc43b5 35
+claude/hooks/redirect-to-nvim.mjs
+  s_e94f11859d390a::t_7e2011fbbafdbb 15
+core/tools.ts
+  s_e94f11859d390a::t_1972758e7d7689 32,65-138
+extension/index.ts
+  s_e94f11859d390a::t_89c13ee5487d7b 13-14,86,285,287,290-306,313,320-351,640,687
+mcp-nvim/README.md
+  s_e94f11859d390a::t_9262bd90d01f3d 10
+mcp-nvim/index.test.ts
+  s_e94f11859d390a::t_55e24cec40189b 8,27-35,89,112-230
+mcp-nvim/index.ts
+  s_e94f11859d390a::t_c9d85b1620bd30 126-127,130-150,153
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.7.5",
+  "base_commit_sha": "393233f6dd60560154816fd91157c989035d778c",
+  "prompts": {},
+  "sessions": {
+    "s_e94f11859d390a": {
+      "agent_id": {
+        "tool": "pi",
+        "id": "01a16963-52de-779f-ba73-db1b8fd1831c",
+        "model": "claude-opus-5-5"
+      },
+      "human_author": "Thiago Pacheco <hi@sudoish.com>"
+    }
+  }
+}
