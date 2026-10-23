@@ -12,6 +12,12 @@ Neovim, the same way the pi extension does. The tool bodies come from
 the compact snapshot text (mode, file:line:col, cursor context, diagnostics, changed
 lines) the model reasons over.
 
+`nvim_capabilities` returns the live `<nvim_capabilities>` manifest (format/test/LSP
+backends, LSP attached to the current buffer, treesitter) plus the `<nvim_keymaps>`
+cheat sheet. The server refreshes the manifest after every tool call and caches both
+in `~/.cache/mystique` (`$MYSTIQUE_CACHE_DIR`), which the Claude Code context hook
+injects; the server's MCP `instructions` carry the last cached copy at startup.
+
 ## Reaching Neovim
 
 Like the extension, in priority order: **external** (`MYSTIQUE_SOCKET=<sock>` from an

@@ -14,6 +14,7 @@ import { StdioServerTransport } from "@modelcontextprotocol/sdk/server/stdio.js"
 import { z } from "zod";
 import { detectMode, NvimSession } from "../core/nvim.ts";
 import * as tools from "../core/tools.ts";
+import { loadCapabilities, loadCheatsheet, saveCapabilities, saveCheatsheet } from "../core/cache.ts";
 
 const luaPath = fileURLToPath(new URL("../core/lua/mystique.lua", import.meta.url));
 
@@ -34,10 +35,39 @@ const LSP_ACTIONS = [
 type TextResult = { content: { type: "text"; text: string }[]; isError?: boolean };
 const ok = (text: string): TextResult => ({ content: [{ type: "text", text: text || "(no output)" }] });
 const fail = (text: string): TextResult => ({ content: [{ type: "text", text }], isError: true });
+/** The <nvim_capabilities> + <nvim_keymaps> context block, from the live session or the cache. */
+export function contextBlock(session: NvimSession): string {
+  const caps = session.capabilities ?? loadCapabilities();
+  const sheet = session.cheatsheet ?? loadCheatsheet();
+  const parts: string[] = [];
+  if (caps) parts.push(`<nvim_capabilities>\n${caps}\n</nvim_capabilities>`);
+  if (sheet) parts.push(`<nvim_keymaps>\n${sheet}\n</nvim_keymaps>`);
+  return parts.join("\n\n");
+}
+
+/**
+ * Server instructions (Claude Code adds them to the system prompt). They are fixed at
+ * startup, before Neovim is connected, so they carry the last cached manifest and point
+ * at nvim_capabilities for a live refresh.
+ */
+function instructions(session: NvimSession): string {
+  const intro =
+    "These tools drive a live, visible Neovim shared with the human. Read and edit only through them. " +
+    "The capabilities say which format/test/LSP backends this config has; call nvim_capabilities for a live " +
+    "refresh (it is per buffer: attached LSP, treesitter) and whenever the sections below are missing.";
+  const ctx = contextBlock(session);
+  return ctx ? `${intro}\n\nLast known editor context (cached):\n${ctx}` : intro;
+}
+
+/** Persist the session's keymaps/capabilities so hooks and later sessions see them. */
+function persist(session: NvimSession): void {
+  if (session.cheatsheet) saveCheatsheet(session.cheatsheet);
+  if (session.caps) saveCapabilities(session.caps);
+}
 
 /** Build the MCP server with all nvim_* tools bound to `session`. Exported for tests. */
 export function createServer(session: NvimSession): McpServer {
-  const server = new McpServer({ name: "mystique-mcp-nvim", version: "0.1.0" });
+  const server = new McpServer({ name: "mystique-mcp-nvim", version: "0.1.0" }, { instructions: instructions(session) });
 
   // Run a tool body with the shared-editor activity guard (mirrors the pi extension's
   // withNvim): detect what the human did since the last tool; for cursor-sensitive
@@ -60,6 +90,8 @@ export function createServer(session: NvimSession): McpServer {
           return ok(`${notice}\nYour action was NOT executed. Re-check the state below and re-plan.\n${snap}`);
         }
         const text = await fn();
+        // Capabilities drift per buffer (attached LSP, treesitter); keep the cache the hooks read current.
+        await session.loadCapabilities().then(() => persist(session), () => { });
         return ok(notice ? `${notice}\n${text}` : text);
       } finally {
         await session.endTool();
@@ -220,6 +252,24 @@ export function createServer(session: NvimSession): McpServer {
       },
     },
     (a) => run("format", true, () => tools.format(session, a.first, a.last)),
+  );
+
+
+  server.registerTool(
+    "nvim_capabilities",
+    {
+      description:
+        "Probe the live Neovim config: format/test/comment backends, LSP attached to the current buffer, grep, " +
+        "treesitter, and the user's keymap cheat sheet. Call it at the start of a session and after opening a " +
+        "different kind of file, then pick tools from it (no LSP attached → edit by hand, test: none → bash).",
+      inputSchema: {},
+    },
+    () =>
+      run("capabilities", false, async () => {
+        await session.loadCapabilities();
+        persist(session);
+        return contextBlock(session) || "(capabilities unavailable)";
+      }),
   );
 
   return server;

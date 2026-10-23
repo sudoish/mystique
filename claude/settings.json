@@ -4,6 +4,20 @@
     "deny": ["Read", "Edit", "Write", "Grep", "Glob", "NotebookEdit"]
   },
   "hooks": {
+    "SessionStart": [
+      {
+        "hooks": [
+          { "type": "command", "command": "node ABS_PATH_TO_MYSTIQUE/claude/hooks/nvim-context.mjs" }
+        ]
+      }
+    ],
+    "UserPromptSubmit": [
+      {
+        "hooks": [
+          { "type": "command", "command": "node ABS_PATH_TO_MYSTIQUE/claude/hooks/nvim-context.mjs" }
+        ]
+      }
+    ],
     "PreToolUse": [
       {
         "matcher": "Read|Edit|Write|Grep|Glob|LS|NotebookEdit",

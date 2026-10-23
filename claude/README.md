@@ -7,7 +7,7 @@ stop Claude from falling back to its builtin file tools.
 Scaffolds CLAUDE_CODE_PLAN milestones 3 (enforcement) and 4 (playbook). The pieces:
 
 - `settings.json` — a template: denies `Read/Edit/Write/Grep/Glob/NotebookEdit` and
-  registers the two PreToolUse hooks.
+  registers the PreToolUse hooks plus the SessionStart/UserPromptSubmit context hook.
 - `hooks/redirect-to-nvim.mjs` — blocks the builtin file tools with a message pointing
   at the `nvim_*` tools (the layer that actually redirects the model).
 - `hooks/guard-bash.mjs` — blocks shell file-bypasses (`sed -i`, `cat`/`rg`/`grep`/
@@ -15,6 +15,10 @@ Scaffolds CLAUDE_CODE_PLAN milestones 3 (enforcement) and 4 (playbook). The piec
   before the command runs.
 - `hooks/bash-policy.mjs` — the shared, tested classifier (same patterns as the pi
   extension's bash guard).
+- `hooks/nvim-context.mjs` — injects `<nvim_capabilities>` + `<nvim_keymaps>` (what the
+  pi extension puts in its system prompt): both at session start, then capabilities
+  only when they change, so the transcript doesn't pile up copies. It reads the cache
+  the MCP server keeps current (`~/.cache/mystique`, or `$MYSTIQUE_CACHE_DIR`).
 - `CLAUDE.md` — the power-user playbook to drop into your project (or `~/.claude`).
 
 ## Setup
@@ -45,7 +49,7 @@ environment if it isn't already.
 ## Tests
 
 ```bash
-npm test   # unit-tests the bash classifier (blocked vs allowed commands)
+npm test   # bash classifier (blocked vs allowed) + context hook injection
 ```
 
 Runs in CI. The hook wiring itself (stdin event → exit code) depends on Claude Code's

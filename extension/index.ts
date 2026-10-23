@@ -3,14 +3,14 @@
  * The Neovim is either the one pi runs inside (a :terminal split, e.g. sidekick.nvim),
  * one the user points us at (MYSTIQUE_SOCKET), or one we spawn in a herdr pane.
  */
-import { mkdirSync, readFileSync, writeFileSync } from "node:fs";
-import { homedir } from "node:os";
+import { readFileSync } from "node:fs";
 import { dirname, join } from "node:path";
 import { fileURLToPath } from "node:url";
 import { StringEnum, Type } from "@earendil-works/pi-ai";
 import { defineTool, type ExtensionAPI, type ExtensionContext } from "@earendil-works/pi-coding-agent";
 import { Text } from "@earendil-works/pi-tui";
-import { type Caps, detectMode, NvimSession, renderCapabilities, type Snapshot } from "../core/nvim.ts";
+import { detectMode, NvimSession, type Snapshot } from "../core/nvim.ts";
+import { loadCapabilities as loadCachedCapabilities, loadCheatsheet as loadCachedCheatsheet, saveCapabilities, saveCheatsheet } from "../core/cache.ts";
 import { findRun, grepRun, testDiagnosis } from "../core/tools.ts";
 
 
@@ -25,8 +25,6 @@ for (const k of ["SOCKET", "SPEED", "POLICY", "CLOSE", "REFOCUS", "AUTOSTART", "
 const here = dirname(fileURLToPath(import.meta.url));
 const session = new NvimSession(join(here, "..", "core", "lua", "mystique.lua"));
 const playbook = readFileSync(join(here, "..", "core", "prompt.md"), "utf8");
-const cacheFile = join(homedir(), ".cache", "mystique", "keymaps.txt");
-const capFile = join(homedir(), ".cache", "mystique", "capabilities.json");
 
 // Without a reachable Neovim (not inside one, not in herdr, no MYSTIQUE_SOCKET) the extension stays
 // inert: builtin tools and bash keep working, so a globally installed copy never cripples plain pi.
@@ -609,37 +607,6 @@ const BASH_BLOCKS: [RegExp, string][] = [
   [/(^|;|&&|\|\|)\s*(rg|grep|ag|ack|find)\b/, "searching via shell"],
   [/\b(python3?|node|ruby)\b\s+-[ce]\b.*\b(write|open|writeFile)/, "scripted file writes"],
 ];
-
-function loadCachedCheatsheet(): string | undefined {
-  try {
-    return readFileSync(cacheFile, "utf8");
-  } catch {
-    return undefined;
-  }
-}
-
-function saveCheatsheet(text: string) {
-  try {
-    mkdirSync(dirname(cacheFile), { recursive: true });
-    writeFileSync(cacheFile, text);
-  } catch { }
-}
-
-/** The cached capability manifest, rendered from the structured JSON so reconnects stay consistent. */
-function loadCachedCapabilities(): string | undefined {
-  try {
-    return renderCapabilities(JSON.parse(readFileSync(capFile, "utf8")) as Caps);
-  } catch {
-    return undefined;
-  }
-}
-
-function saveCapabilities(caps: Caps) {
-  try {
-    mkdirSync(dirname(capFile), { recursive: true });
-    writeFileSync(capFile, JSON.stringify(caps));
-  } catch { }
-}
 
 export default function(pi: ExtensionAPI) {
   for (const t of [keysTool, exTool, insertTool, viewTool, grepTool, findTool, lspTool, checkTool, testsTool, screenTool, testTool, formatTool]) {

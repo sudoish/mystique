@@ -29,10 +29,15 @@ Tool choice, smartest first:
 5. `nvim_insert` only for genuinely new text (pastes literally, so auto-pairs can't corrupt it).
 6. `nvim_format` to format; `nvim_test` (scope nearest|file|suite) to run tests and read results.
 
+Know the editor first: `<nvim_capabilities>` (format/test/LSP backends, attached LSP,
+treesitter) and `<nvim_keymaps>` (the user's mappings — optional shortcuts; respect its
+GOTCHAS) are injected at session start and when capabilities change. If they are missing
+or you open a different kind of file, call `nvim_capabilities`. Where a capability is
+absent (no LSP attached, test: none), fall back to `bash` or hand-editing.
+
 Verify with `nvim_check` (saves all buffers, returns settled LSP diagnostics) before
 running tests. If a snapshot shows a `BLOCKING` prompt or an error, resolve it first
-(often `<Esc>`). Where a capability is absent (no LSP attached, no test runner), fall
-back to `bash` or hand-editing.
+(often `<Esc>`).
 
 Reaching the editor: the `nvim` MCP server connects to `MYSTIQUE_SOCKET` (an
 `nvim --listen` you started), `$NVIM` (Claude running in a Neovim terminal), or herdr.

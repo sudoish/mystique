@@ -70,10 +70,10 @@ Claude Code has no API to delete `Read`/`Edit`/`Write`. Two layers:
   the user's mappings, the way the pi extension injects them.
 
 ### 5. Parity checklist
-- [ ] Shared editor activity guard (cursor-sensitive tools no-op after a human edit).
-- [ ] Embedded focus handling (move out of the pi/claude terminal window, bounce back).
-- [ ] neotest results via `nvim_tests`.
-- [ ] Keymap cheat sheet generation + `<leader>` expansion.
+- [x] Shared editor activity guard (cursor-sensitive tools no-op after a human edit).
+- [x] Embedded focus handling (move out of the pi/claude terminal window, bounce back). — N/A for the stdio MCP server (pi/embedded only).
+- [x] neotest results via `nvim_tests`.
+- [x] Keymap cheat sheet + capabilities + `<leader>` expansion — `nvim_capabilities` tool, MCP instructions, and the `claude/hooks/nvim-context.mjs` SessionStart/UserPromptSubmit hook (shared cache in core/cache.ts).
 - [ ] `/nvim*`-style controls → expose as MCP tools or slash-command scripts.
 
 ## Open questions / limits

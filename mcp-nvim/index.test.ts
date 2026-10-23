@@ -5,7 +5,7 @@
  */
 import assert from "node:assert/strict";
 import { execFileSync, spawn, type ChildProcess } from "node:child_process";
-import { existsSync, mkdirSync, mkdtempSync, rmSync, writeFileSync } from "node:fs";
+import { existsSync, mkdirSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { fileURLToPath } from "node:url";
@@ -51,6 +51,7 @@ describe("mcp-nvim server over MCP", { skip: hasNvim() ? false : "nvim not insta
   let session: NvimSession;
   let client: Client;
   const prevSocket = process.env.MYSTIQUE_SOCKET;
+  const prevCache = process.env.MYSTIQUE_CACHE_DIR;
 
   before(async () => {
     cwd = mkdtempSync(join(tmpdir(), "mystique-mcp-"));
@@ -64,6 +65,7 @@ describe("mcp-nvim server over MCP", { skip: hasNvim() ? false : "nvim not insta
       await sleep(100);
     }
     process.env.MYSTIQUE_SOCKET = socket;
+    process.env.MYSTIQUE_CACHE_DIR = join(cwd, ".cache"); // never touch the user's real cache
 
     session = new NvimSession(luaPath);
     session.speed = "fast";
@@ -81,6 +83,8 @@ describe("mcp-nvim server over MCP", { skip: hasNvim() ? false : "nvim not insta
     if (cwd && existsSync(cwd)) rmSync(cwd, { recursive: true, force: true });
     if (prevSocket === undefined) delete process.env.MYSTIQUE_SOCKET;
     else process.env.MYSTIQUE_SOCKET = prevSocket;
+    if (prevCache === undefined) delete process.env.MYSTIQUE_CACHE_DIR;
+    else process.env.MYSTIQUE_CACHE_DIR = prevCache;
   });
 
   test("lists the nvim_* tools", async () => {
@@ -89,6 +93,19 @@ describe("mcp-nvim server over MCP", { skip: hasNvim() ? false : "nvim not insta
     for (const n of ["nvim_keys", "nvim_ex", "nvim_view", "nvim_grep", "nvim_find", "nvim_lsp", "nvim_format", "nvim_test"]) {
       assert.ok(names.includes(n), `expected tool ${n}, got ${names.join(", ")}`);
     }
+  });
+
+  test("instructions point at nvim_capabilities", () => {
+    assert.match(client.getInstructions() ?? "", /nvim_capabilities/);
+  });
+
+  test("nvim_capabilities returns the live manifest and caches it for the Claude Code hook", async () => {
+    const text = textOf(await client.callTool({ name: "nvim_capabilities", arguments: {} }));
+    assert.match(text, /<nvim_capabilities>\nNeovim \d+\.\d+\.\d+\./, text);
+    assert.match(text, /<nvim_keymaps>\nLeader is /, text);
+    const cached = readFileSync(join(cwd, ".cache", "capabilities.txt"), "utf8");
+    assert.match(cached, /^Neovim \d/);
+    assert.match(readFileSync(join(cwd, ".cache", "keymaps.txt"), "utf8"), /^Leader is /);
   });
 
   test("nvim_ex + nvim_view read a file", async () => {
