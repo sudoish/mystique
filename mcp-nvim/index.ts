@@ -66,8 +66,9 @@ function persist(session: NvimSession): void {
 }
 
 /** Build the MCP server with all nvim_* tools bound to `session`. Exported for tests. */
-export function createServer(session: NvimSession): McpServer {
-  const server = new McpServer({ name: "mystique-mcp-nvim", version: "0.1.0" }, { instructions: instructions(session) });
+/** `tools: false` (no Neovim reachable at startup) registers nothing, so a global install adds no schemas. */
+export function createServer(session: NvimSession, { tools: enabled = true } = {}): McpServer {
+  const server = new McpServer({ name: "mystique-mcp-nvim", version: "0.1.0" }, { instructions: enabled ? instructions(session) : "No Neovim reachable from this session; Mystique's nvim_* tools are disabled." });
 
   // Run a tool body with the shared-editor activity guard (mirrors the pi extension's
   // withNvim): detect what the human did since the last tool; for cursor-sensitive
@@ -101,6 +102,7 @@ export function createServer(session: NvimSession): McpServer {
     }
   };
 
+  if (!enabled) return server;
   server.registerTool(
     "nvim_keys",
     {
@@ -278,7 +280,7 @@ export function createServer(session: NvimSession): McpServer {
 async function main(): Promise<void> {
   const session = new NvimSession(luaPath);
   session.speed = "fast";
-  const server = createServer(session);
+  const server = createServer(session, { tools: detectMode() !== undefined });
   const transport = new StdioServerTransport();
   await server.connect(transport);
 }

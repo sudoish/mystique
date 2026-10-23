@@ -44,6 +44,19 @@ function textOf(result: unknown): string {
     .join("\n");
 }
 
+test("without a reachable Neovim the server exposes no tools (global install stays out of the way)", async () => {
+  const server = createServer(new NvimSession(luaPath), { tools: false });
+  const [clientTransport, serverTransport] = InMemoryTransport.createLinkedPair();
+  const c = new Client({ name: "test", version: "0.0.0" });
+  await Promise.all([server.connect(serverTransport), c.connect(clientTransport)]);
+  try {
+    assert.equal(c.getServerCapabilities()?.tools, undefined);
+    assert.match(c.getInstructions() ?? "", /disabled/);
+  } finally {
+    await c.close();
+  }
+});
+
 describe("mcp-nvim server over MCP", { skip: hasNvim() ? false : "nvim not installed" }, () => {
   let proc: ChildProcess;
   let cwd: string;

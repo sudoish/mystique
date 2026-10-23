@@ -10,6 +10,7 @@
  */
 import { spawnSync } from "node:child_process";
 import { blockMessage, classifyBash } from "./bash-policy.mjs";
+import { policyActive } from "./active.mjs";
 
 async function main() {
   const chunks = [];
@@ -22,7 +23,7 @@ async function main() {
   }
   const command = String(event?.tool_input?.command ?? "");
 
-  const what = classifyBash(command);
+  const what = policyActive() ? classifyBash(command) : null; // inert outside Neovim
   if (what) {
     process.stderr.write(`${blockMessage(what)}\n`);
     process.exit(2);

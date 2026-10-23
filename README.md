@@ -8,8 +8,8 @@ code through a **live, visible Neovim** instead of writing files behind your bac
 
 Like its namesake, Mystique adapts to whatever it finds: it uses your attached LSP servers, your formatter
 (conform, else LSP, else `gq`), and your test runner (neotest, else vim-test) — no project-specific wiring.
-And it is agent-agnostic: today it drives [pi](https://github.com/earendil-works/pi); Claude Code is on the
-roadmap (see [CLAUDE_CODE_PLAN.md](CLAUDE_CODE_PLAN.md)).
+And it is agent-agnostic: it drives [pi](https://github.com/earendil-works/pi) and Claude Code
+(one command: `node claude/install.mjs`, see [claude/](claude/README.md)).
 
 ## Why
 
@@ -121,7 +121,7 @@ through `nvim_input`, the same path as real typing, so everything renders live.
 
 ## Roadmap
 
-- Claude Code support: the [mcp-nvim](mcp-nvim/) server plus [claude/](claude/) hooks + `CLAUDE.md` are scaffolded; remaining is running the TDD flow inside Claude Code end to end (see [CLAUDE_CODE_PLAN.md](CLAUDE_CODE_PLAN.md)).
+- Claude Code: installed via `node claude/install.mjs` and validated headless (playbook + capabilities injected, builtin file tools blocked inside Neovim, inert outside). Remaining: `/nvim*`-style controls.
 - Expand the [evaluation suite](eval/) (more multi-file tasks, cost reporting). First results: [eval/RESULTS.md](eval/RESULTS.md).
 
 ## Demo

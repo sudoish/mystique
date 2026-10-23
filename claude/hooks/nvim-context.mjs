@@ -1,6 +1,6 @@
 #!/usr/bin/env node
 /**
- * Claude Code SessionStart + UserPromptSubmit hook: give the model the live editor
+ * Claude Code SessionStart + UserPromptSubmit hook: give the model the playbook and live editor
  * context the pi extension puts in its system prompt each turn — the capability
  * manifest (<nvim_capabilities>) and the user's keymap cheat sheet (<nvim_keymaps>).
  *
@@ -9,17 +9,25 @@
  *
  * Claude Code keeps hook output in the transcript, so unlike pi (which replaces a system
  * prompt section) re-injecting every turn would pile up copies. Instead:
- *   - SessionStart (startup/resume/clear/compact): inject both sections.
+ *   - SessionStart (startup/resume/clear/compact): inject the playbook (claude/CLAUDE.md),
+ *     capabilities and keymaps.
  *   - UserPromptSubmit: inject <nvim_capabilities> only when it changed since this
  *     session last saw it (e.g. an LSP attached after opening a source file).
+ * Outside Neovim (see active.mjs) it adds nothing, so a global install is harmless.
  */
 import { mkdirSync, readFileSync, writeFileSync } from "node:fs";
 import { homedir } from "node:os";
-import { join } from "node:path";
-import { pathToFileURL } from "node:url";
+import { dirname, join } from "node:path";
+import { fileURLToPath, pathToFileURL } from "node:url";
+import { nvimActive } from "./active.mjs";
 
 export function cacheDir() {
   return process.env.MYSTIQUE_CACHE_DIR || join(homedir(), ".cache", "mystique");
+}
+
+/** The power-user playbook (claude/CLAUDE.md), injected so no global CLAUDE.md edit is needed. */
+function readPlaybook() {
+  return read(join(dirname(fileURLToPath(import.meta.url)), "..", "CLAUDE.md"))?.trim();
 }
 
 function read(file) {
@@ -39,7 +47,8 @@ function seenFile(dir, sessionId) {
  * Decide what to inject for a hook event. Returns the additionalContext text, or "" for
  * nothing. Records the injected capabilities per session so unchanged turns stay silent.
  */
-export function buildContext(event, dir = cacheDir()) {
+export function buildContext(event, dir = cacheDir(), { active = nvimActive(), playbook = readPlaybook() } = {}) {
+  if (!active) return ""; // no Neovim here: plain Claude Code, add nothing
   const name = event?.hook_event_name;
   const caps = read(join(dir, "capabilities.txt"))?.trim();
   const sheet = read(join(dir, "keymaps.txt"))?.trim();
@@ -53,14 +62,11 @@ export function buildContext(event, dir = cacheDir()) {
 
   if (name === "SessionStart") {
     remember();
-    const parts = [];
+    const parts = playbook ? [`<nvim_playbook>\n${playbook}\n</nvim_playbook>`] : [];
     if (caps) parts.push(`<nvim_capabilities>\n${caps}\n</nvim_capabilities>`);
+    else parts.push("No cached Neovim capabilities yet: call nvim_capabilities before editing.");
     if (sheet) parts.push(`<nvim_keymaps>\n${sheet}\n</nvim_keymaps>`);
-    if (!parts.length) {
-      return "No cached Neovim capabilities yet: call the nvim_capabilities tool before editing to learn the " +
-        "format/test/LSP backends and the user's keymaps.";
-    }
-    return `Editor context from the last Neovim connection (refresh with nvim_capabilities):\n${parts.join("\n\n")}`;
+    return `Mystique is active: this session drives a live Neovim (refresh context with nvim_capabilities).\n\n${parts.join("\n\n")}`;
   }
 
   if (name === "UserPromptSubmit") {

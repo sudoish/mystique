@@ -19,32 +19,37 @@ Scaffolds CLAUDE_CODE_PLAN milestones 3 (enforcement) and 4 (playbook). The piec
   pi extension puts in its system prompt): both at session start, then capabilities
   only when they change, so the transcript doesn't pile up copies. It reads the cache
   the MCP server keeps current (`~/.cache/mystique`, or `$MYSTIQUE_CACHE_DIR`).
-- `CLAUDE.md` — the power-user playbook to drop into your project (or `~/.claude`).
+- `install.mjs` — the one-shot installer (below); `hooks/active.mjs` — the "is a Neovim
+  reachable?" check that keeps everything inert elsewhere.
+- `CLAUDE.md` — the power-user playbook (injected by the context hook).
 
 ## Setup
 
 ```bash
-# 1. Install the engine + MCP server
-cd core && npm install && cd ../mcp-nvim && npm install
-
-# 2. Start an editor for Claude to drive
-nvim --listen /tmp/nvim.sock
-
-# 3. Register the MCP server (adjust the absolute path)
-claude mcp add nvim \
-  --env MYSTIQUE_SOCKET=/tmp/nvim.sock \
-  -- node --import tsx /abs/path/to/mystique/mcp-nvim/index.ts
+node claude/install.mjs              # install / update (user scope: every project)
+node claude/install.mjs --uninstall  # remove everything it added
 ```
 
-Then enable enforcement + playbook:
+It installs `core/` + `mcp-nvim/` deps if missing, registers the `nvim` MCP server
+(`claude mcp add -s user`), and merges into `~/.claude/settings.json` (backup:
+`settings.json.bak-mystique`, your own hooks/settings untouched): the context hook,
+the two PreToolUse guards, and `mcp__nvim` in `permissions.allow`.
 
-- Merge `settings.json` into your project `.claude/settings.json` (or `~/.claude/
-  settings.json`), replacing `ABS_PATH_TO_MYSTIQUE` with your checkout path.
-- Copy `CLAUDE.md` into your project root (or append to `~/.claude/CLAUDE.md`).
+Then just run `claude` **inside a Neovim `:terminal`** (e.g. sidekick.nvim), or with
+`MYSTIQUE_SOCKET=<sock>` pointing at an `nvim --listen <sock>`, or in herdr — it drives
+that editor, gets the playbook + capabilities + keymaps injected, and the builtin file
+tools are blocked. **Anywhere else nothing changes**: the hooks are inert, the MCP
+server exposes no tools, and nothing is injected. `MYSTIQUE_POLICY=off` keeps the
+nvim tools but lifts the blocking.
+
+The global setup deliberately adds no `permissions.deny` (a deny can't be conditional,
+so it would cripple plain `claude`); the hooks do the blocking. For a project that
+should *always* be editor-only, `settings.json` here is a stricter template that adds
+the deny list — replace `ABS_PATH_TO_MYSTIQUE` and merge into `.claude/settings.json`.
+`CLAUDE.md` needs no copying: the context hook injects it.
 
 The hooks run on bare `node` (no build step). `guard-bash.mjs` saves buffers through
-`nvim --server $MYSTIQUE_SOCKET` (falls back to `$NVIM`); set one of those in the hook
-environment if it isn't already.
+`nvim --server $MYSTIQUE_SOCKET` (falls back to `$NVIM`) before allowed commands.
 
 ## Tests
 

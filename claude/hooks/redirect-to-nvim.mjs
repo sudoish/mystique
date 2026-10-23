@@ -4,9 +4,12 @@
  * NotebookEdit). Blocks them and tells the model to use the nvim_* MCP tools instead —
  * the belt-and-suspenders layer behind permissions.deny, and the one that carries the
  * redirect message. Exit 2 = block, stderr shown to the model.
+ * Inert (exit 0) when no Neovim is reachable or MYSTIQUE_POLICY=off.
  *
  * Register under hooks.PreToolUse with matcher "Read|Edit|Write|Grep|Glob|LS|NotebookEdit".
  */
+import { policyActive } from "./active.mjs";
+
 const MAP = {
   Read: "nvim_view (live buffer contents)",
   Edit: "nvim_keys / nvim_ex / nvim_insert, or nvim_lsp rename",
@@ -18,6 +21,7 @@ const MAP = {
 };
 
 async function main() {
+  if (!policyActive()) process.exit(0); // no Neovim here: leave the builtin tools alone
   const chunks = [];
   for await (const c of process.stdin) chunks.push(c);
   let tool = "";
