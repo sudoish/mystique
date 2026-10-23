@@ -1,0 +1,21 @@
+extension/package.json
+  s_1b069e4f66bbbb::t_09a8aba0c44384 6-9,19-24
+extension/package-lock.json
+  s_1b069e4f66bbbb::t_98259cad4e00da 14-412,435-561,1004-1028,1038-1071,1073,1076-1081,1083-1088,1090-1116,1118-1119,1122,1125-1130,1132-1134,1137,1140-1364,1381-1443,1492-1505,1512-1733,1735-1738,1742,1763-1826,1859-1917,1940-1979,1989-2128,2143-2152,2182-2224,2234-2244,2269-2282,2302-2339,2346-2371,2407-2444
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.7.5",
+  "base_commit_sha": "9c1972bbe5bfe5204695c3cb2c50238516813d5b",
+  "prompts": {},
+  "sessions": {
+    "s_1b069e4f66bbbb": {
+      "agent_id": {
+        "tool": "pi",
+        "id": "01a16474-ac4b-771f-b7e3-92fb8cb757dc",
+        "model": "claude-opus-4-8"
+      },
+      "human_author": "Thiago Pacheco <hi@sudoish.com>"
+    }
+  }
+}
