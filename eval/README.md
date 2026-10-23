@@ -64,5 +64,7 @@ npm test        # metrics parser (recorded sample) + fixture/check self-test
 - Real runs cost tokens and vary between trials; treat single runs as anecdotes.
 - `baseline` uses `--no-extensions` so a globally-configured Mystique never leaks
   into the control.
-- A fresh workspace may trigger pi's project-trust prompt; configure trust (or a
-  non-interactive default) before unattended runs.
+- The harness runs pi with `--approve` (trusts the temp workspace) and a closed
+  stdin, so json-mode runs never stall on a trust prompt or wait for input.
+- Each run has a 300s cap; a timed-out run is killed and recorded with whatever
+  metrics had streamed so far.

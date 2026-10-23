@@ -66,16 +66,17 @@ async function startNvim(cwd: string): Promise<{ socket: string; stop: () => voi
   };
 }
 
-function runPi(cwd: string, args: string[], env: NodeJS.ProcessEnv): Promise<{ stdout: string; code: number | null }> {
+function runPi(cwd: string, args: string[], env: NodeJS.ProcessEnv, timeoutMs = 300000): Promise<{ stdout: string; code: number | null }> {
   return new Promise((resolve) => {
-    const child = spawn(piBin, args, { cwd, env });
+    const child = spawn(piBin, args, { cwd, env, stdio: ["ignore", "pipe", "pipe"] });
     let stdout = "";
     child.stdout.on("data", (d) => {
       stdout += String(d);
     });
     child.stderr.on("data", () => { });
-    child.on("close", (code) => resolve({ stdout, code }));
-    child.on("error", () => resolve({ stdout, code: -1 }));
+    const timer = setTimeout(() => child.kill("SIGKILL"), timeoutMs);
+    child.on("close", (code) => { clearTimeout(timer); resolve({ stdout, code }); });
+    child.on("error", () => { clearTimeout(timer); resolve({ stdout, code: -1 }); });
   });
 }
 
@@ -84,7 +85,7 @@ async function runTrial(task: Task, mode: Mode, trial: number, model?: string): 
   let nvim: { socket: string; stop: () => void } | undefined;
   const started = Date.now();
   try {
-    const args = ["--mode", "json", "--no-session", "--no-extensions"];
+    const args = ["--mode", "json", "--no-session", "--no-extensions", "--approve"];
     if (model) args.push("--model", model);
     const env: NodeJS.ProcessEnv = { ...process.env };
     if (mode === "mystique") {
