@@ -1,0 +1,74 @@
+eval/fixtures/rename-and-fix/solution/src/cart.ts
+  s_1b069e4f66bbbb::t_6864a1976d94e9 1-6,8-17
+  s_1b069e4f66bbbb::t_9525b7c2182fab 7
+eval/fixtures/rename-and-fix/solution/src/main.ts
+  s_1b069e4f66bbbb::t_6864a1976d94e9 2-4,6-8,10
+  s_1b069e4f66bbbb::t_4adab30a8138e5 1
+  s_1b069e4f66bbbb::t_781858ea4c1280 5
+  s_1b069e4f66bbbb::t_ce765ae8667fa6 9
+  s_1b069e4f66bbbb::t_a18e380b3c6998 11
+eval/fixtures/rename-and-fix/initial/tsconfig.json
+  s_1b069e4f66bbbb::t_6864a1976d94e9 1-10
+eval/fixtures/rename-and-fix/initial/src/main.ts
+  s_1b069e4f66bbbb::t_6864a1976d94e9 1-11
+eval/fixtures/fix-type-errors/solution/src/cart.ts
+  s_1b069e4f66bbbb::t_6864a1976d94e9 1-17
+eval/fixtures/fix-type-errors/solution/src/main.ts
+  s_1b069e4f66bbbb::t_6864a1976d94e9 1-4,6-10
+  s_1b069e4f66bbbb::t_a2d1a9fed24831 5
+  s_1b069e4f66bbbb::t_0727eabb5bb83e 11
+eval/fixtures/rename-and-fix/initial/src/cart.ts
+  s_1b069e4f66bbbb::t_6864a1976d94e9 1-17
+eval/fixtures/fix-type-errors/solution/tsconfig.json
+  s_1b069e4f66bbbb::t_6864a1976d94e9 1-10
+eval/fixtures/rename-and-fix/solution/tsconfig.json
+  s_1b069e4f66bbbb::t_6864a1976d94e9 1-10
+eval/package-lock.json
+  s_1b069e4f66bbbb::t_b65501ac14f5f4 1-564
+eval/.gitignore
+  s_1b069e4f66bbbb::t_2ce4e79b23b24f 1-3
+eval/README.md
+  s_1b069e4f66bbbb::t_09b31d6ca535cd 1-68
+eval/fixtures/fix-type-errors/initial/src/cart.ts
+  s_1b069e4f66bbbb::t_a46979d08fb46f 1-17
+eval/fixtures/fix-type-errors/initial/src/main.ts
+  s_1b069e4f66bbbb::t_5f82ad9af829db 1-11
+eval/fixtures/fix-type-errors/initial/tsconfig.json
+  s_1b069e4f66bbbb::t_d56c194f6feb91 1-10
+eval/package.json
+  s_1b069e4f66bbbb::t_11b53027fef613 1-15
+eval/samples/sample-run.jsonl
+  s_1b069e4f66bbbb::t_fc44177720b1e7 1-27
+eval/src/metrics.ts
+  s_1b069e4f66bbbb::t_2b3e18a2a5097a 1-160
+eval/src/report.ts
+  s_1b069e4f66bbbb::t_b45f89587b8358 1-85
+eval/src/run.ts
+  s_1b069e4f66bbbb::t_576d9013501c8e 1-146
+eval/src/tasks.ts
+  s_1b069e4f66bbbb::t_35298023e65c69 1-83
+eval/src/workspace.ts
+  s_1b069e4f66bbbb::t_dda99725af3214 1-11
+eval/tests/fixtures.test.ts
+  s_1b069e4f66bbbb::t_7e066498bd7ec5 1-32
+eval/tests/metrics.test.ts
+  s_1b069e4f66bbbb::t_3cd9dff2a0b2ca 1-53
+eval/tsconfig.json
+  s_1b069e4f66bbbb::t_c85259de925e3a 1-21
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.7.5",
+  "base_commit_sha": "0f3724a7048298d5803d4b14d781c6a39459d09a",
+  "prompts": {},
+  "sessions": {
+    "s_1b069e4f66bbbb": {
+      "agent_id": {
+        "tool": "pi",
+        "id": "01a16474-ac4b-771f-b7e3-92fb8cb757dc",
+        "model": "claude-opus-4-8"
+      },
+      "human_author": "Thiago Pacheco <hi@sudoish.com>"
+    }
+  }
+}
