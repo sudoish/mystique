@@ -1,0 +1,27 @@
+{"type":"session","version":3,"id":"00000000-0000-0000-0000-000000000000","timestamp":"2024-12-03T14:00:00.000Z","cwd":"/tmp/x"}
+{"type":"agent_start"}
+{"type":"turn_start"}
+{"type":"message_start","message":{"role":"user","content":"Fix the type errors","timestamp":1733234401000}}
+{"type":"message_end","message":{"role":"user","content":"Fix the type errors","timestamp":1733234401000}}
+{"type":"message_start","message":{"role":"assistant","content":[],"stopReason":"pending"}}
+{"type":"message_update","usage":{"input":100,"output":10,"cacheRead":0,"cacheWrite":0,"totalTokens":110,"cost":{"total":0.001}},"assistantMessageEvent":{"type":"text_delta","contentIndex":0,"delta":"Looking"}}
+{"type":"message_update","usage":{"input":100,"output":40,"cacheRead":0,"cacheWrite":0,"totalTokens":140,"cost":{"total":0.002}},"assistantMessageEvent":{"type":"toolcall_start","contentIndex":1,"id":"c1","toolName":"nvim_view"}}
+{"type":"message_end","message":{"role":"assistant","content":[],"stopReason":"tool_use"}}
+{"type":"tool_execution_start","toolCallId":"c1","toolName":"nvim_view","args":{}}
+{"type":"tool_execution_end","toolCallId":"c1","toolName":"nvim_view","result":{"content":[]},"isError":false}
+{"type":"turn_end","message":{"role":"assistant","content":[]},"toolResults":[]}
+{"type":"turn_start"}
+{"type":"message_start","message":{"role":"assistant","content":[],"stopReason":"pending"}}
+{"type":"message_update","usage":{"input":200,"output":30,"cacheRead":50,"cacheWrite":0,"totalTokens":230,"cost":{"total":0.003}},"assistantMessageEvent":{"type":"toolcall_start","contentIndex":0,"id":"c2","toolName":"nvim_ex"}}
+{"type":"message_end","message":{"role":"assistant","content":[],"stopReason":"tool_use"}}
+{"type":"tool_execution_start","toolCallId":"c2","toolName":"nvim_ex","args":{}}
+{"type":"tool_execution_end","toolCallId":"c2","toolName":"nvim_ex","result":{"content":[]},"isError":false}
+{"type":"tool_execution_end","toolCallId":"c3","toolName":"nvim_check","result":{"content":[]},"isError":true}
+{"type":"turn_end","message":{"role":"assistant","content":[]},"toolResults":[]}
+{"type":"turn_start"}
+{"type":"message_start","message":{"role":"assistant","content":[],"stopReason":"pending"}}
+{"type":"message_update","usage":{"input":260,"output":20,"cacheRead":100,"cacheWrite":0,"totalTokens":280,"cost":{"total":0.004}},"assistantMessageEvent":{"type":"text_delta","contentIndex":0,"delta":"Done"}}
+{"type":"message_end","message":{"role":"assistant","content":[],"stopReason":"end_turn"}}
+{"type":"turn_end","message":{"role":"assistant","content":[]},"toolResults":[]}
+{"type":"agent_end","messages":[],"willRetry":false}
+{"type":"agent_settled","aborted":false}

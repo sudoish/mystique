@@ -129,8 +129,8 @@ Plus a ~40-line cheat sheet of the user's own mappings (harpoon, oil, lspsaga, â
 - [x] Prompt playbook, keymap cheat sheet, custom TUI renderers, pacing modes
 - [x] Human activity detection + guard (shared editor)
 - [x] Watchdog for blocking prompts
-- [ ] Evaluation suite (5-10 tasks; tokens/keystrokes vs plain pi)
-- [ ] Run tests inside nvim (neotest / `:terminal`) and read results
+- [x] Evaluation suite (5-10 tasks; tokens/keystrokes vs plain pi) â€” harness in `eval/` (fixtures, metrics parser, A/B runner, self-tests); real-model numbers pending
+- [x] Run tests inside nvim (neotest / `:terminal`) and read results (nvim_test / nvim_tests: neotest, else vim-test)
 - [ ] Close stale quickfix windows / tidy layout between tasks
 
 ## Build order

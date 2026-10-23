@@ -122,12 +122,13 @@ through `nvim_input`, the same path as real typing, so everything renders live.
 ## Roadmap
 
 - Claude Code support via an MCP server + hooks (see [CLAUDE_CODE_PLAN.md](CLAUDE_CODE_PLAN.md)).
-- An evaluation suite comparing tokens and keystrokes against plain pi on representative tasks.
+- Run the [evaluation suite](eval/) on real models and publish the tokens/tool-call comparison against plain pi.
 
 ## Demo
 
 `demo/` is a tiny TypeScript project with two type errors and a project-local language server;
 `demo-tests/` is a Jest project used to exercise the test-driven flow.
+`eval/` is the [evaluation harness](eval/README.md) that A/B-compares Mystique against plain pi (tokens, tool calls, success) on these fixtures.
 
 ## Development
 
@@ -142,8 +143,8 @@ npm test        # unit tests + an integration test that drives a headless Neovim
 `nvim.test.ts` unit-tests the pure helpers (e.g. the capability manifest renderer).
 `nvim.integration.test.ts` spawns a real `nvim --listen` and drives it through
 `NvimSession` end to end; it skips automatically when `nvim` isn't on `PATH`.
-CI (`.github/workflows/ci.yml`) runs the type-check, both test suites, and the
-`demo-tests` Jest flow on every push and pull request.
+CI (`.github/workflows/ci.yml`) type-checks and tests the extension (with Neovim for the
+integration test), the `eval/` harness, and the `demo-tests` Jest flow on every push and PR.
 
 ## License
 

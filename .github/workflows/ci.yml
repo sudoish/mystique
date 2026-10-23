@@ -61,3 +61,27 @@ jobs:
       - name: Test
         working-directory: demo-tests
         run: npm test
+
+  eval:
+    name: Evaluation harness (typecheck + tests)
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: "22"
+          cache: npm
+          cache-dependency-path: eval/package-lock.json
+
+      - name: Install
+        working-directory: eval
+        run: npm ci
+
+      - name: Typecheck
+        working-directory: eval
+        run: npm run check
+
+      - name: Test
+        working-directory: eval
+        run: npm test
