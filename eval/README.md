@@ -34,6 +34,7 @@ For each **task × mode × trial** the harness (`src/run.ts`):
 | `rename-and-fix` | rename `calc`→`cartTotal` everywhere and fix the errors | `tsc` clean + old name gone |
 | `multi-file-rename` | rename `getUser`→`fetchUser` across 6 files | `tsc` clean + old name gone everywhere |
 | `tdd-loop` | implement `classify()` so the failing tests pass | `node --test` green |
+| `find-and-fix` | swap hardcoded `withRetry(…, 3)` for `RETRY_LIMIT` amid decoy 3s, an ignored `vendor/` and a minified bundle | `tsc` clean + all calls use `RETRY_LIMIT` + decoys/vendor untouched |
 
 Each task has a `solution/` fixture used only by the self-test to prove the check
 passes on a correct result and fails on the untouched `initial/`.

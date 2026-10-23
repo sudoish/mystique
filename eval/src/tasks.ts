@@ -128,6 +128,47 @@ export const tasks: Task[] = [
       return { pass: false, detail: `node --test: ${pass} pass / ${fail} fail` };
     },
   },
+  {
+    id: "find-and-fix",
+    title: "Replace hardcoded retry counts with RETRY_LIMIT",
+    fixture: "find-and-fix",
+    prompt:
+      "Some services pass a hardcoded retry count to `withRetry` instead of using `RETRY_LIMIT` from " +
+      "src/config/limits.ts. Find every such call under src/ and make it use `RETRY_LIMIT`. Leave unrelated " +
+      "3s (page sizes, comments) and vendor/ untouched. `tsc --noEmit` must stay clean.",
+    check: async (dir) => {
+      const tsc = await tscPasses(dir);
+      if (!tsc.pass) return tsc;
+      const srcDir = join(dir, "src");
+      const files = (await readdir(srcDir, { recursive: true })).filter((f) => String(f).endsWith(".ts"));
+      const hardcoded: string[] = [];
+      let calls = 0;
+      for (const f of files) {
+        const text = await readFile(join(srcDir, String(f)), "utf8");
+        for (const m of text.matchAll(/withRetry\(.*\),\s*([^)\s]+)\);/g)) {
+          calls += 1;
+          if (m[1] !== "RETRY_LIMIT") hardcoded.push(String(f));
+        }
+      }
+      if (hardcoded.length > 0) return { pass: false, detail: `hardcoded retry count in ${hardcoded.join(", ")}` };
+      if (calls < 5) return { pass: false, detail: `expected 5 withRetry calls, found ${calls}` };
+      // Decoys: unrelated 3s and the vendored bundle must survive untouched.
+      const decoys: Array<[string, string]> = [
+        ["src/config/limits.ts", "RETRY_LIMIT = 3"],
+        ["src/services/search.ts", "pageSize = 3"],
+        ["src/lib/http.ts", "at most 3 redirects"],
+        ["src/services/billing.ts", "at most 3 times"],
+      ];
+      for (const [rel, needle] of decoys) {
+        if (!(await fileText(dir, rel)).includes(needle)) return { pass: false, detail: `decoy changed: ${rel}` };
+      }
+      for (const rel of ["vendor/retry-kit.min.js", "vendor/retry-kit/README.md"]) {
+        const orig = await fileText(join(fixturesDir, "find-and-fix", "initial"), rel);
+        if ((await fileText(dir, rel)) !== orig) return { pass: false, detail: `vendor file modified: ${rel}` };
+      }
+      return { pass: true, detail: `tsc clean, ${calls} withRetry calls use RETRY_LIMIT, decoys intact` };
+    },
+  },
 ];
 
 export function getTask(id: string): Task | undefined {
