@@ -121,7 +121,7 @@ through `nvim_input`, the same path as real typing, so everything renders live.
 
 ## Roadmap
 
-- Claude Code support: the [mcp-nvim](mcp-nvim/) server is built; still to do are PreToolUse hooks to disable the builtin file tools and a `CLAUDE.md` playbook (see [CLAUDE_CODE_PLAN.md](CLAUDE_CODE_PLAN.md)).
+- Claude Code support: the [mcp-nvim](mcp-nvim/) server plus [claude/](claude/) hooks + `CLAUDE.md` are scaffolded; remaining is running the TDD flow inside Claude Code end to end (see [CLAUDE_CODE_PLAN.md](CLAUDE_CODE_PLAN.md)).
 - Expand the [evaluation suite](eval/) (more multi-file tasks, cost reporting). First results: [eval/RESULTS.md](eval/RESULTS.md).
 
 ## Demo
@@ -139,6 +139,7 @@ through `nvim_input`, the same path as real typing, so everything renders live.
 - `extension/` — the pi adapter: `defineTool` wrappers, TUI renderers, policy
   guards and slash commands. Imports `../core`.
 - `mcp-nvim/` — an MCP server exposing the same `nvim_*` tools (backed by `core/`) for Claude Code and other MCP agents. See [mcp-nvim/README.md](mcp-nvim/README.md).
+- `claude/` — Claude Code hooks + settings + `CLAUDE.md` that pair with mcp-nvim to enforce editor-only editing. See [claude/README.md](claude/README.md).
 - `eval/` — the A/B evaluation harness. `demo/`, `demo-tests/` — fixtures.
 
 ## Development

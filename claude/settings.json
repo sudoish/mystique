@@ -1,0 +1,22 @@
+{
+  "_comment": "Mystique / Claude Code settings TEMPLATE. Replace ABS_PATH_TO_MYSTIQUE with the absolute path to your mystique checkout, and set MYSTIQUE_SOCKET on the mcp-nvim server (see claude/README.md). Merge into .claude/settings.json (project) or ~/.claude/settings.json (global).",
+  "permissions": {
+    "deny": ["Read", "Edit", "Write", "Grep", "Glob", "NotebookEdit"]
+  },
+  "hooks": {
+    "PreToolUse": [
+      {
+        "matcher": "Read|Edit|Write|Grep|Glob|LS|NotebookEdit",
+        "hooks": [
+          { "type": "command", "command": "node ABS_PATH_TO_MYSTIQUE/claude/hooks/redirect-to-nvim.mjs" }
+        ]
+      },
+      {
+        "matcher": "Bash",
+        "hooks": [
+          { "type": "command", "command": "node ABS_PATH_TO_MYSTIQUE/claude/hooks/guard-bash.mjs" }
+        ]
+      }
+    ]
+  }
+}

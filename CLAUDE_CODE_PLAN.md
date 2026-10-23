@@ -87,6 +87,6 @@ Claude Code has no API to delete `Read`/`Edit`/`Write`. Two layers:
 ## Milestones
 1. (done) `core/` extracted; pi extension still green against it. — core/ is a pi-free package (NvimSession, mystique.lua, prompt.md, Snapshot, capability rendering + tests); extension imports ../core and stays green (typecheck + runtime verified).
 2. (done) `mcp-nvim` server driving Neovim end to end (manual test, no guard). — mcp-nvim/ exposes all nvim_* tools (bodies shared from core/tools.ts) over MCP; an in-memory client drives a headless nvim end to end (4/4 in CI).
-3. Permissions + PreToolUse hooks enforcing editor-only edits.
-4. `CLAUDE.md` playbook + keymaps; run the shipping/fibonacci TDD flow in Claude Code.
+3. (scaffolded) Permissions + PreToolUse hooks enforcing editor-only edits. — claude/ ships settings.json (deny Read/Edit/Write/Grep/Glob) + PreToolUse hooks: redirect-to-nvim (block builtin file tools) and guard-bash (block shell file-bypasses, save buffers first). Shared bash classifier unit-tested in CI. Live wiring verified manually (needs Claude Code).
+4. (scaffolded) `CLAUDE.md` playbook + keymaps; run the shipping/fibonacci TDD flow in Claude Code. — claude/CLAUDE.md ships the playbook (MCP tools, economy, tool-choice ladder). Running the shipping/fibonacci TDD flow inside Claude Code is the remaining manual validation.
 5. Activity guard + focus parity.

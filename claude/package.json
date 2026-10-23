@@ -1,0 +1,9 @@
+{
+  "name": "@mystique/claude",
+  "private": true,
+  "type": "module",
+  "description": "Claude Code integration: PreToolUse hooks (deny builtin file tools, guard bash, save before bash) + settings template + CLAUDE.md playbook. Pairs with the mcp-nvim server.",
+  "scripts": {
+    "test": "node --test"
+  }
+}
