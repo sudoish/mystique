@@ -19,10 +19,16 @@ jobs:
           cache-dependency-path: extension/package-lock.json
 
       # Neovim is needed for the integration test (it drives a headless instance).
-      - uses: rhysd/action-setup-vim@v1
-        with:
-          neovim: true
-          version: stable
+      # Download the official stable tarball directly — the setup-vim action trips over
+      # an EXDEV cross-device rename on current runners.
+      - name: Install Neovim
+        run: |
+          curl -fsSL -o nvim.tar.gz https://github.com/neovim/neovim/releases/download/stable/nvim-linux-x86_64.tar.gz
+          tar xzf nvim.tar.gz
+          echo "$PWD/nvim-linux-x86_64/bin" >> "$GITHUB_PATH"
+
+      - name: Verify Neovim
+        run: nvim --version | head -1
 
       - name: Install
         working-directory: extension
