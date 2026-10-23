@@ -1,0 +1,27 @@
+bin/mystique.mjs
+  s_5b66bb3d52a72c::t_a6bdd93b14b7bc 1-306
+package-lock.json
+  s_5b66bb3d52a72c::t_1fcd6b08886207 1-2036
+claude/install.mjs
+  s_5b66bb3d52a72c::t_21da7b17f54087 8,88-99,101-103,108-111,113,130-136
+install.sh
+  s_5b66bb3d52a72c::t_1bd57dc01cb450 1-39
+package.json
+  s_5b66bb3d52a72c::t_4df5d7f441ff0d 1-39
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.7.5",
+  "base_commit_sha": "3c5fac5bde5a5d72a8bb6c4da4b1302cd7896936",
+  "prompts": {},
+  "sessions": {
+    "s_5b66bb3d52a72c": {
+      "agent_id": {
+        "tool": "pi",
+        "id": "01a169ae-7126-7338-878b-bb6eea5c15a6",
+        "model": "claude-opus-5-5"
+      },
+      "human_author": "Thiago Pacheco <hi@sudoish.com>"
+    }
+  }
+}
