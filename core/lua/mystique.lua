@@ -140,6 +140,10 @@ local function numbered(buf, a, b, cur)
   local out = {}
   for i, l in ipairs(lines) do
     local n = a + i - 1
+    if #l > 300 then -- minified bundles: one line can be 20 KB+, repeated in ctx and changed blocks
+      local keep = 300 + vim.str_utf_start(l, 301) -- end before the char holding byte 301
+      l = ("%s…(+%d bytes)"):format(l:sub(1, keep), #l - keep)
+    end
     out[#out + 1] = string.format("%s%d│%s", n == cur and ">" or " ", n, l)
   end
   return table.concat(out, "\n")
