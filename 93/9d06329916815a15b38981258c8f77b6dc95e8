@@ -1,0 +1,16 @@
+eval/RESULTS.md
+  h_8a472ace01776f 3-4,14-15,20,22,28-46,50-61
+extension/prompt.md
+  h_8a472ace01776f 1-2,4-8,10-18,20-23,25-29
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.7.5",
+  "base_commit_sha": "939d06329916815a15b38981258c8f77b6dc95e8",
+  "prompts": {},
+  "humans": {
+    "h_8a472ace01776f": {
+      "author": "Thiago Pacheco <hi@sudoish.com>"
+    }
+  }
+}
