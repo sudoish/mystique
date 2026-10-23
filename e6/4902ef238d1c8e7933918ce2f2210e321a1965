@@ -1,0 +1,16 @@
+CLAUDE_CODE_PLAN.md
+  h_8a472ace01776f 92
+mcp-nvim/index.ts
+  h_8a472ace01776f 42-46,55-66,80,91,105,120,132,147,156,165,179,188,201
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.7.5",
+  "base_commit_sha": "e64902ef238d1c8e7933918ce2f2210e321a1965",
+  "prompts": {},
+  "humans": {
+    "h_8a472ace01776f": {
+      "author": "Thiago Pacheco <hi@sudoish.com>"
+    }
+  }
+}
