@@ -1,0 +1,20 @@
+core/lua/mystique.lua
+  h_8a472ace01776f 263,505-563,570,586-587,617-619,789,799-802
+core/tools.ts
+  h_8a472ace01776f 171,178-199,208
+extension/index.ts
+  h_8a472ace01776f 14,475-483,492-493
+mcp-nvim/index.test.ts
+  h_8a472ace01776f 136-161
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.7.5",
+  "base_commit_sha": "5bb787e0e4561d37770a40721b86dad83f8ad72d",
+  "prompts": {},
+  "humans": {
+    "h_8a472ace01776f": {
+      "author": "Thiago Pacheco <hi@sudoish.com>"
+    }
+  }
+}
