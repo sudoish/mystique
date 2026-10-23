@@ -24,6 +24,7 @@ import { makeWorkspace } from "./workspace.ts";
 const piBin = process.env.PI_BIN ?? "pi";
 const extensionPath = fileURLToPath(new URL("../../extension/index.ts", import.meta.url));
 const resultsDir = fileURLToPath(new URL("../results", import.meta.url));
+const lspInit = fileURLToPath(new URL("../nvim-lsp-init.lua", import.meta.url));
 const sleep = (ms: number) => new Promise((r) => setTimeout(r, ms));
 
 interface Opts {
@@ -31,24 +32,28 @@ interface Opts {
   modes: Mode[];
   trials: number;
   model?: string;
+  lsp: boolean;
 }
 
 function parseArgs(argv: string[]): Opts {
-  const o: Opts = { tasks: [], modes: ["baseline", "mystique"], trials: 1 };
+  const o: Opts = { tasks: [], modes: ["baseline", "mystique"], trials: 1, lsp: false };
   for (let i = 0; i < argv.length; i++) {
     const a = argv[i];
     if (a === "--tasks") o.tasks = (argv[++i] ?? "").split(",").filter(Boolean);
     else if (a === "--modes") o.modes = (argv[++i] ?? "").split(",").filter(Boolean) as Mode[];
     else if (a === "--trials") o.trials = Math.max(1, Number(argv[++i]) || 1);
     else if (a === "--model") o.model = argv[++i];
+    else if (a === "--lsp") o.lsp = true;
   }
   return o;
 }
 
 /** Spawn a dedicated headless Neovim for a Mystique-mode run; returns its socket + cleanup. */
-async function startNvim(cwd: string): Promise<{ socket: string; stop: () => void }> {
+
+async function startNvim(cwd: string, lsp: boolean): Promise<{ socket: string; stop: () => void }> {
+  const uarg = lsp ? ["-u", lspInit] : ["-u", "NONE"];
   const socket = join(tmpdir(), `mystique-eval-${process.pid}-${Date.now().toString(36)}.sock`);
-  const proc = spawn("nvim", ["--headless", "-n", "-u", "NONE", "--listen", socket], { cwd, stdio: "ignore" });
+  const proc = spawn("nvim", ["--headless", "-n", ...uarg, "--listen", socket], { cwd, stdio: "ignore" });
   const deadline = Date.now() + 15000;
   while (!existsSync(socket)) {
     if (Date.now() > deadline) {
@@ -80,7 +85,7 @@ function runPi(cwd: string, args: string[], env: NodeJS.ProcessEnv, timeoutMs = 
   });
 }
 
-async function runTrial(task: Task, mode: Mode, trial: number, model?: string): Promise<TrialResult> {
+async function runTrial(task: Task, mode: Mode, trial: number, model?: string, lsp = false): Promise<TrialResult> {
   const dir = await makeWorkspace(task, "initial");
   let nvim: { socket: string; stop: () => void } | undefined;
   const started = Date.now();
@@ -89,7 +94,7 @@ async function runTrial(task: Task, mode: Mode, trial: number, model?: string): 
     if (model) args.push("--model", model);
     const env: NodeJS.ProcessEnv = { ...process.env };
     if (mode === "mystique") {
-      nvim = await startNvim(dir);
+      nvim = await startNvim(dir, lsp);
       env.MYSTIQUE_SOCKET = nvim.socket;
       env.MYSTIQUE_SPEED = "fast";
       args.push("-e", extensionPath);
@@ -126,7 +131,7 @@ async function main(): Promise<void> {
     for (const mode of opts.modes) {
       for (let trial = 1; trial <= opts.trials; trial++) {
         process.stderr.write(`▶ ${task.id} / ${mode} / trial ${trial}…\n`);
-        const r = await runTrial(task, mode, trial, opts.model);
+        const r = await runTrial(task, mode, trial, opts.model, opts.lsp);
         process.stderr.write(
           `  ${r.pass ? "✓" : "✗"} ${r.detail} · ${Math.round(r.metrics.totalTokens)} tok · ${r.metrics.totalToolCalls} tools · ${(r.durationMs / 1000).toFixed(1)}s\n`,
         );

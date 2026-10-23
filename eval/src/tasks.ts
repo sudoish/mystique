@@ -100,6 +100,34 @@ export const tasks: Task[] = [
       return { pass: true, detail: `tsc clean and getUser renamed across ${files.length} files` };
     },
   },
+  {
+    id: "tdd-loop",
+    title: "Make the failing classify() tests pass",
+    fixture: "tdd-loop",
+    prompt:
+      "classify.test.mjs has failing tests for `classify(n)` in classify.mjs (it should return " +
+      '"positive", "negative" or "zero"). Implement classify so `node --test` passes. Do not edit the test file.',
+    check: async (dir) => {
+      // Strip NODE_TEST_CONTEXT so a child `node --test` prints a normal summary even
+      // when this check runs inside node's own test runner (the self-test).
+      const env = { ...process.env };
+      delete env.NODE_TEST_CONTEXT;
+      let out: string;
+      try {
+        const res = await execFileAsync("node", ["--test"], { cwd: dir, env });
+        out = `${res.stdout}${res.stderr}`;
+      } catch (e) {
+        const err = e as { stdout?: string; stderr?: string };
+        out = `${err.stdout ?? ""}${err.stderr ?? ""}`;
+      }
+      // node --test uses the spec reporter ("ℹ pass N") or TAP ("# pass N") depending on
+      // context; match the count regardless of prefix.
+      const pass = Number(out.match(/pass (\d+)/)?.[1] ?? 0);
+      const fail = Number(out.match(/fail (\d+)/)?.[1] ?? 1);
+      if (pass >= 3 && fail === 0) return { pass: true, detail: `node --test: ${pass} passing` };
+      return { pass: false, detail: `node --test: ${pass} pass / ${fail} fail` };
+    },
+  },
 ];
 
 export function getTask(id: string): Task | undefined {

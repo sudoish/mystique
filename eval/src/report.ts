@@ -58,8 +58,8 @@ export function renderReport(results: TrialResult[], meta: { model?: string; whe
   if (meta.model) out.push(`- model: ${meta.model}`);
   out.push(`- tasks: ${tasks.length}`, "");
   out.push("Lower tokens / tool-calls is better; success rate should stay at 100%.", "");
-  out.push("| Task | Mode | Success | Tokens | Tool calls | Turns | Duration |");
-  out.push("|---|---|---|--:|--:|--:|--:|");
+  out.push("| Task | Mode | Success | Tokens | Tool calls | Turns | Cost ($) | Duration |");
+  out.push("|---|---|---|--:|--:|--:|--:|--:|");
   for (const task of tasks) {
     for (const mode of ["baseline", "mystique"] as Mode[]) {
       const r = rows.find((x) => x.task === task && x.mode === mode);
@@ -67,7 +67,7 @@ export function renderReport(results: TrialResult[], meta: { model?: string; whe
       out.push(
         `| ${task} | ${mode} | ${(r.successRate * 100).toFixed(0)}% (${r.trials}) | ` +
         `${n0(r.avg.totalTokens)} | ${r.avg.totalToolCalls.toFixed(1)} | ` +
-        `${r.avg.turns.toFixed(1)} | ${(r.avgDurationMs / 1000).toFixed(1)}s |`,
+        `${r.avg.turns.toFixed(1)} | $${r.avg.costUsd.toFixed(4)} | ${(r.avgDurationMs / 1000).toFixed(1)}s |`,
       );
     }
   }

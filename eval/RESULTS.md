@@ -22,6 +22,8 @@ pi (`--no-extensions`); it does not load Mystique, so prompt changes don't affec
 | rename-and-fix | mystique | 100% (3) | 124,650 | 14.0 | 15.0 | 45.9s |
 | multi-file-rename | baseline | 100% (3) | 38,638 | 16.0 | 6.3 | 31.3s |
 | multi-file-rename | mystique | 100% (3) | 39,709 | 4.3 | 5.3 | 21.2s |
+| tdd-loop | baseline | 100% (3) | 27,147 | 5.3 | 5.7 | 18.1s |
+| tdd-loop | mystique | 100% (3) | 104,664 | 12.7 | 13.3 | 31.1s |
 
 ### Mystique vs baseline (Δ)
 
@@ -30,6 +32,24 @@ pi (`--no-extensions`); it does not load Mystique, so prompt changes don't affec
 | fix-type-errors | +258% | +92% |
 | rename-and-fix | +179% | +51% |
 | multi-file-rename | +3% | -73% |
+| tdd-loop | +286% | +138% |
+
+## With a real LSP, Mystique beats baseline (multi-file-rename)
+
+Re-running `multi-file-rename` with `--lsp` (the harness starts `ts_ls` in the eval's
+Neovim via `nvim-lsp-init.lua`, so the agent can use `nvim_lsp` rename) against the same
+plain-pi baseline:
+
+| multi-file-rename | Tokens | Tool calls | Turns | Cost ($) | Duration |
+|---|--:|--:|--:|--:|--:|
+| baseline (plain pi) | 38,638 | 16.0 | 6.3 | — | 31.3s |
+| mystique, no LSP (grep + :cdo) | 39,709 | 4.3 | 5.3 | — | 21.2s |
+| mystique, --lsp (nvim_lsp rename) | **31,839** | **3.3** | 4.3 | $0.0172 | 17.1s |
+
+With the LSP live, Mystique is **−18% tokens and −79% tool calls vs baseline**, 100%
+success — it renames the symbol project-wide in ~3 calls instead of editing 6 files by
+hand. This is the case the architecture is built for: a semantic, multi-site change where
+one editor operation replaces N file edits.
 
 ## Prompt-overhead optimization (before → after)
 
@@ -64,7 +84,9 @@ turns re-viewing to confirm edits, which the "trust the snapshot" rule removes.
   `nvim -u NONE`); a real `nvim_lsp` rename would be tighter still.
 
 ## Next
+- Done since the last snapshot: cost (USD) column, a TDD-loop task, and an opt-in
+  real-LSP environment (`--lsp`, see the section above).
+- A second model and more trials for tighter intervals; a lint-fix and an
+  API-migration task.
+- Backfill the cost column for the older rows above (they predate it).
 
-- Bigger multi-file tasks and a real-LSP environment (an `nvim_lsp` rename) to push the multi-file advantage further.
-- A TDD loop task exercising `nvim_test` red → green.
-- Report cost (USD) alongside tokens; add a cheap/other-model column.

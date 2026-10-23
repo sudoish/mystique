@@ -33,6 +33,7 @@ For each **task × mode × trial** the harness (`src/run.ts`):
 | `fix-type-errors` | fix two TS type errors | `tsc --noEmit` clean |
 | `rename-and-fix` | rename `calc`→`cartTotal` everywhere and fix the errors | `tsc` clean + old name gone |
 | `multi-file-rename` | rename `getUser`→`fetchUser` across 6 files | `tsc` clean + old name gone everywhere |
+| `tdd-loop` | implement `classify()` so the failing tests pass | `node --test` green |
 
 Each task has a `solution/` fixture used only by the self-test to prove the check
 passes on a correct result and fails on the untouched `initial/`.
@@ -46,6 +47,9 @@ cd eval && npm install
 # and `nvim` on PATH for the mystique mode):
 npm run run-eval -- --model <pattern> --trials 3
 npm run run-eval -- --tasks fix-type-errors --modes baseline,mystique --trials 5
+# --lsp starts ts_ls in the eval's nvim (via nvim-lsp-init.lua) so the agent can
+# use nvim_lsp (rename/definition) instead of a :cdo sweep. Needs typescript-language-server on PATH.
+npm run run-eval -- --tasks multi-file-rename --modes mystique --trials 3 --lsp
 ```
 
 Results are nondeterministic, so use several trials and compare aggregates.
