@@ -291,7 +291,7 @@ const grepTool = defineTool({
       Type.String({ description: "Directory or file to search, e.g. 'src' (keeps .gitignore in effect)" }),
     ),
     glob: Type.Optional(
-      Type.String({ description: "File filter, e.g. '*.ts'. Overrides .gitignore, so prefer path for scoping" }),
+      Type.String({ description: "File filter: '*.ts' matches names anywhere, 'src/**/*.ts' paths, '!*.md' excludes (.gitignore still applies)" }),
     ),
     limit: Type.Optional(Type.Number({ description: "Max hits listed line by line (default 40); above it you get per-file counts" })),
     word: Type.Optional(Type.Boolean({ description: "Whole-word matches only (e.g. `id` won't match `userId`)" })),

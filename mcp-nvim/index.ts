@@ -128,7 +128,7 @@ export function createServer(session: NvimSession): McpServer {
       inputSchema: {
         pattern: z.string().describe("ripgrep regex"),
         path: z.string().optional().describe("Directory or file to search, e.g. 'src' (keeps .gitignore in effect)"),
-        glob: z.string().optional().describe("File filter, e.g. '*.ts'. Overrides .gitignore, so prefer path for scoping"),
+        glob: z.string().optional().describe("File filter: '*.ts' matches names anywhere, 'src/**/*.ts' paths, '!*.md' excludes (.gitignore still applies)"),
         limit: z.number().int().positive().optional().describe("Max hits listed line by line (default 40); above it you get per-file counts"),
         word: z.boolean().optional().describe("Whole-word matches only (e.g. `id` won't match `userId`)"),
         literal: z.boolean().optional().describe("Pattern is a literal string, not a regex (no escaping needed)"),

@@ -64,9 +64,9 @@ export async function view(session: NvimSession, path = "", start = 1, end = 0):
 
 export interface GrepArgs {
   pattern: string;
-  /** Directory or file to search; keeps .gitignore in effect (unlike a glob). */
+  /** Directory or file to search. */
   path?: string;
-  /** File filter, e.g. '*.ts'. Note: ripgrep globs override ignore rules. */
+  /** File filter applied to the hits, e.g. `*.ts`, `src/**` or `!*.md`; .gitignore still applies. */
   glob?: string;
   /** Max hits to list line by line; above it the result is per-file counts (default 40). */
   limit?: number;
@@ -92,7 +92,7 @@ export interface GrepResult {
  * snapshot: a search changes nothing, and the cursor context would be an unrelated file.
  */
 export async function grepRun(session: NvimSession, a: GrepArgs): Promise<GrepResult> {
-  const r = await session.lua<{ total: number; files: number; text: string }>("return Mystique.grep(...)", [
+  const r = await session.lua<{ total: number; files: number; text: string; unsaved?: string[] }>("return Mystique.grep(...)", [
     a.pattern,
     {
       path: a.path ?? "",
@@ -107,7 +107,10 @@ export async function grepRun(session: NvimSession, a: GrepArgs): Promise<GrepRe
   const head = r.total
     ? `${r.total} match${r.total === 1 ? "" : "es"} in ${r.files} file${r.files === 1 ? "" : "s"}`
     : `no matches for ${a.pattern}${a.path ? ` in ${a.path}` : ""}`;
-  return { total: r.total, files: r.files, text: r.text ? `${head}\n${r.text}` : head };
+  const unsaved = r.unsaved?.length
+    ? `\nnote: unsaved edits in ${r.unsaved.slice(0, 5).join(", ")}${r.unsaved.length > 5 ? " …" : ""}; grep reads files on disk`
+    : "";
+  return { total: r.total, files: r.files, text: (r.text ? `${head}\n${r.text}` : head) + unsaved };
 }
 
 export async function grep(session: NvimSession, a: GrepArgs): Promise<string> {
@@ -125,13 +128,17 @@ export interface FindArgs {
 
 /** Fuzzy file-name search (rg --files ranked by matchfuzzy): the best paths first. */
 export async function findRun(session: NvimSession, a: FindArgs): Promise<{ total: number; text: string }> {
-  const r = await session.lua<{ total: number; searched: number; items: string[] }>("return Mystique.find(...)", [
+  const r = await session.lua<{ total: number; searched: number; items: string[]; hidden?: number }>("return Mystique.find(...)", [
     a.query,
     { path: a.path ?? "", limit: a.limit ?? 20 },
   ]);
   if (!r.total) return { total: 0, text: `no files match ${a.query} (${r.searched} searched)` };
   const shown = r.items.length < r.total ? `, top ${r.items.length}` : "";
-  return { total: r.total, text: `${r.total} file${r.total === 1 ? "" : "s"} match ${a.query}${shown}:\n${r.items.join("\n")}` };
+  const hidden = r.hidden ? `\n(+${r.hidden} weaker matches with the letters scattered across the path)` : "";
+  return {
+    total: r.total,
+    text: `${r.total} file${r.total === 1 ? "" : "s"} match ${a.query}${shown}:\n${r.items.join("\n")}${hidden}`,
+  };
 }
 
 export async function find(session: NvimSession, a: FindArgs): Promise<string> {

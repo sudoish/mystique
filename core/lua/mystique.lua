@@ -16,6 +16,7 @@ M.last_state = M.last_state or nil -- {buf, cursor, mode} when the last tool fin
 M.gen = (M.gen or 0) + 1 -- bumped on (re)load and detach: stale buffer listeners drop out
 M.attached = {}
 M.shadow = {} -- bufnr -> buffer text at the last change report (to drop no-op rewrites)
+M.last_bufs = nil -- buffer list last sent in a snapshot (resent only when it changes)
 
 local api, fn = vim.api, vim.fn
 
@@ -474,7 +475,10 @@ function M.snapshot(opts)
     for _, info in ipairs(fn.getbufinfo({ buflisted = 1 })) do
       if info.name ~= "" then bufs[#bufs + 1] = rel(info.name) .. (info.changed == 1 and "+" or "") end
     end
-    snap.bufs = bufs
+    -- The list rarely changes but cost about 50 tokens on every call: send it only when it differs.
+    local key = table.concat(bufs, " ")
+    if key ~= M.last_bufs then snap.bufs = bufs end
+    M.last_bufs = key
   end
   return snap
 end
@@ -866,23 +870,57 @@ local function grep_report(items, limit, context)
       if #files[a] ~= #files[b] then return #files[a] > #files[b] end
       return a < b
     end)
-    out[#out + 1] = ("over the %d-hit listing limit; hits per file:"):format(limit)
     local maxf = 25
-    for i, name in ipairs(order) do
-      if i > maxf then
-        out[#out + 1] = ("  …(%d more files)"):format(#order - maxf)
-        break
+    if #order <= maxf then
+      out[#out + 1] = ("over the %d-hit listing limit; hits per file:"):format(limit)
+      for _, name in ipairs(order) do out[#out + 1] = ("  %d %s"):format(#files[name], name) end
+    else
+      -- Many files: a per-directory rollup (two levels deep) shows where to narrow at a glance.
+      local dirs, dorder = {}, {}
+      for _, name in ipairs(order) do
+        local parts = vim.split(name, "/", { plain = true })
+        local d = #parts == 1 and "./" or (table.concat(parts, "/", 1, math.min(2, #parts - 1)) .. "/")
+        if not dirs[d] then
+          dirs[d] = 0
+          dorder[#dorder + 1] = d
+        end
+        dirs[d] = dirs[d] + #files[name]
       end
-      out[#out + 1] = ("  %d %s"):format(#files[name], name)
+      table.sort(dorder, function(a, b)
+        if dirs[a] ~= dirs[b] then return dirs[a] > dirs[b] end
+        return a < b
+      end)
+      out[#out + 1] = ("over the %d-hit listing limit; hits by directory:"):format(limit)
+      for i = 1, math.min(10, #dorder) do out[#out + 1] = ("  %d %s"):format(dirs[dorder[i]], dorder[i]) end
+      if #dorder > 10 then out[#out + 1] = ("  …(%d more directories)"):format(#dorder - 10) end
+      out[#out + 1] = "busiest files:"
+      for i = 1, 10 do out[#out + 1] = ("  %d %s"):format(#files[order[i]], order[i]) end
     end
     out[#out + 1] = "All hits are in quickfix (cdo/cfirst work). Narrow with path, glob or a tighter pattern, or raise limit."
   end
   return { total = total, files = #order, text = table.concat(out, "\n") }
 end
 
+-- rg-style glob as a post-filter (never overrides ignore rules): without a `/` it matches the file
+-- name anywhere (`*.ts`), with one the relative path (`src/**/*.ts`); a leading `!` excludes.
+-- nil when this Neovim has no vim.glob (the caller falls back to rg's --glob).
+local function glob_filter(glob)
+  if not (vim.glob and vim.glob.to_lpeg) then return nil end
+  local negate = glob:sub(1, 1) == "!"
+  if negate then glob = glob:sub(2) end
+  local ok, pat = pcall(vim.glob.to_lpeg, glob)
+  if not ok then error("invalid glob: " .. glob, 0) end
+  local by_name = not glob:find("/", 1, true)
+  return function(file)
+    file = (file:gsub("^%./", ""))
+    local hit = pat:match(by_name and vim.fs.basename(file) or file) ~= nil
+    return hit ~= negate
+  end
+end
+
 -- Project search. ripgrep runs from an argv (no shell or Ex parsing, so `|`, `%`, `#` and quotes are
--- literal) and its hits are loaded into quickfix. `path` scopes by directory, so .gitignore still
--- applies; a `--glob` filter overrides ignore rules (it can pull node_modules back in).
+-- literal) and its hits are loaded into quickfix. `path` scopes by directory; `glob` filters the
+-- hits afterwards. Either way .gitignore holds (rg's own --glob would pull ignored files back in).
 -- One entry per matching line (not per match like --vimgrep); rg keeps only a 1000-byte
 -- preview of longer lines (minified bundles), and grep_report windows the rest around the match.
 function M.grep(pattern, opts)
@@ -890,10 +928,11 @@ function M.grep(pattern, opts)
   local path = opts.path ~= "" and opts.path or nil
   local glob = opts.glob ~= "" and opts.glob or nil
   local items = {}
+  local keep = glob and glob_filter(glob)
   if fn.executable("rg") == 1 then
     local cmd = { "rg", "--with-filename", "--line-number", "--column", "--no-heading", "--color=never", "--hidden",
       "--glob", "!.git", "--max-columns", "1000", "--max-columns-preview" }
-    if glob then vim.list_extend(cmd, { "--glob", glob }) end
+    if glob and not keep then vim.list_extend(cmd, { "--glob", glob }) end -- old Neovim: no vim.glob
     local case = { sensitive = "--case-sensitive", ignore = "--ignore-case" }
     cmd[#cmd + 1] = case[opts.case] or "--smart-case"
     if opts.word then cmd[#cmd + 1] = "--word-regexp" end
@@ -908,7 +947,7 @@ function M.grep(pattern, opts)
     end
     for line in out:gmatch("[^\n]+") do
       local f, l, c, t = line:match("^(.-):(%d+):(%d+):(.*)$")
-      if f then items[#items + 1] = { filename = f, lnum = tonumber(l), col = tonumber(c), text = t } end
+      if f and (not keep or keep(f)) then items[#items + 1] = { filename = f, lnum = tonumber(l), col = tonumber(c), text = t } end
     end
     fn.setqflist({}, " ", { title = "rg " .. pattern, items = items })
   else
@@ -923,7 +962,16 @@ function M.grep(pattern, opts)
   else
     vim.cmd("cclose")
   end
-  return grep_report(items, tonumber(opts.limit) or 40, math.min(tonumber(opts.context) or 0, 5))
+  local report = grep_report(items, tonumber(opts.limit) or 40, math.min(tonumber(opts.context) or 0, 5))
+  -- rg reads disk: say so when buffers hold edits it can't see (stale hits or line numbers).
+  report.unsaved = {}
+  for _, b in ipairs(api.nvim_list_bufs()) do
+    local name = api.nvim_buf_get_name(b)
+    if vim.bo[b].buflisted and vim.bo[b].modified and vim.bo[b].buftype == "" and name ~= "" then
+      report.unsaved[#report.unsaved + 1] = rel(name)
+    end
+  end
+  return report
 end
 
 -- Find files by name: the project's files (rg --files, so .gitignore applies) ranked by
@@ -947,10 +995,33 @@ function M.find(query, opts)
       fn.globpath(path or ".", "**/*", false, true))
     files = vim.tbl_map(function(f) return (f:gsub("^%./", "")) end, files)
   end
-  local matches = query ~= "" and fn.matchfuzzy(files, query) or files
+  -- matchfuzzy alone ranks paths that merely contain the letters in order ("tools" → cart.ts).
+  -- Tier the matches: name contains the query > path contains it > fuzzy on the name > fuzzy
+  -- on the path (score order kept within a tier). Scattered path matches are hidden whenever a
+  -- better tier exists; `hidden` says how many, so nothing disappears silently.
+  local matches, hidden = files, 0
+  if query ~= "" then
+    local q = query:lower()
+    local tiers = { {}, {}, {}, {} }
+    for _, f in ipairs(fn.matchfuzzy(files, query)) do
+      local base = vim.fs.basename(f):lower()
+      local t = 4
+      if base:find(q, 1, true) then
+        t = 1
+      elseif f:lower():find(q, 1, true) then
+        t = 2
+      elseif #fn.matchfuzzy({ base }, query) > 0 then
+        t = 3
+      end
+      table.insert(tiers[t], f)
+    end
+    matches = {}
+    for t = 1, 3 do vim.list_extend(matches, tiers[t]) end
+    if #matches == 0 then matches = tiers[4] else hidden = #tiers[4] end
+  end
   local shown = {}
   for i = 1, math.min(limit, #matches) do shown[i] = matches[i] end
-  return { total = #matches, searched = #files, items = shown }
+  return { total = #matches, searched = #files, items = shown, hidden = hidden }
 end
 
 ---------------------------------------------------------------------------

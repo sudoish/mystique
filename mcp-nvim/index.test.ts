@@ -125,11 +125,20 @@ describe("mcp-nvim server over MCP", { skip: hasNvim() ? false : "nvim not insta
     assert.doesNotMatch(text, /changed multi\.ts (1|3|1-3)/, text);
   });
 
+  test("the buffer list is sent only when it changes", async () => {
+    const ex = async (cmd: string) => textOf(await client.callTool({ name: "nvim_ex", arguments: { cmd } }));
+    await ex("echo 1"); // settle: whatever list exists now has been sent
+    assert.doesNotMatch(await ex("echo 2"), /buffers:/);
+    assert.match(await ex("badd extra.ts"), /buffers: .*extra\.ts/);
+    assert.doesNotMatch(await ex("echo 3"), /buffers:/);
+  });
+
   describe("nvim_grep", { skip: hasRg() ? false : "rg not installed" }, () => {
     const grep = async (args: Record<string, unknown>) =>
       textOf(await client.callTool({ name: "nvim_grep", arguments: args }));
 
-    before(() => {
+    before(async () => {
+      await client.callTool({ name: "nvim_ex", arguments: { cmd: "silent! %bwipeout!" } }); // drop earlier tests' unsaved edits
       mkdirSync(join(cwd, "src"), { recursive: true });
       mkdirSync(join(cwd, "node_modules", "dep"), { recursive: true });
       // rg honors .ignore even outside a git repo (the temp dir isn't one).
@@ -208,6 +217,31 @@ describe("mcp-nvim server over MCP", { skip: hasNvim() ? false : "nvim not insta
     test("a single file as path still yields file names", async () => {
       assert.match(await grep({ pattern: "needle", path: "src/b.ts" }), /^1 match in 1 file\nsrc\/b\.ts\n {2}1:14 /);
     });
+
+    test("glob filters hits but never brings ignored files back", async () => {
+      assert.match(await grep({ pattern: "needle", glob: "*.js" }), /^no matches/); // node_modules/dep/index.js
+      assert.match(await grep({ pattern: "needle", glob: "*.ts" }), /^4 matches in 2 files/);
+      assert.match(await grep({ pattern: "needle", glob: "src/**" }), /^4 matches in 2 files/);
+      assert.match(await grep({ pattern: "needle", path: "src", glob: "!b.ts" }), /^3 matches in 1 file\nsrc\/a\.ts/);
+    });
+
+    test("many files roll up by directory plus the busiest files", async () => {
+      for (const [dir, n] of [["many/x", 20], ["other/y", 10]] as const) {
+        mkdirSync(join(cwd, dir), { recursive: true });
+        for (let i = 0; i < n; i++) writeFileSync(join(cwd, dir, `f${i}.txt`), "rollup\n");
+      }
+      const text = await grep({ pattern: "rollup", limit: 5 });
+      assert.match(text, /^30 matches in 30 files\nover the 5-hit listing limit; hits by directory:\n {2}20 many\/x\/\n {2}10 other\/y\/\nbusiest files:\n/);
+      assert.equal(text.match(/^ {2}1 /gm)?.length, 10, text); // top 10 files, not all 30
+    });
+
+    test("warns when buffers hold unsaved edits grep can't see", async () => {
+      await client.callTool({ name: "nvim_ex", arguments: { cmd: "edit src/b.ts | s/needle/pin/" } });
+      const text = await grep({ pattern: "needle", path: "src" });
+      assert.match(text, /\nnote: unsaved edits in src\/b\.ts; grep reads files on disk$/);
+      await client.callTool({ name: "nvim_ex", arguments: { cmd: "edit! src/b.ts" } });
+      assert.doesNotMatch(await grep({ pattern: "needle", path: "src" }), /unsaved/);
+    });
   });
 
   describe("nvim_find", { skip: hasRg() ? false : "rg not installed" }, () => {
@@ -221,11 +255,23 @@ describe("mcp-nvim server over MCP", { skip: hasNvim() ? false : "nvim not insta
     });
 
     test("limit caps the list and says so", async () => {
-      assert.match(await find({ query: "ts", limit: 1 }), /^\d+ files match ts, top 1:\n[^\n]+$/);
+      assert.match(await find({ query: "ts", limit: 1 }), /^\d+ files match ts, top 1:\n[^\n]+/);
     });
 
     test("no match is reported with the searched count", async () => {
       assert.match(await find({ query: "zzzqqq" }), /^no files match zzzqqq \(\d+ searched\)$/);
+    });
+
+    test("name matches outrank scattered path matches, which are hidden but counted", async () => {
+      writeFileSync(join(cwd, "src", "tools.ts"), "export {};\n");
+      mkdirSync(join(cwd, "docs", "the", "odd", "old"), { recursive: true });
+      writeFileSync(join(cwd, "docs", "the", "odd", "old", "list.md"), "t-o-o-l-s across the path\n");
+      assert.equal(
+        await find({ query: "tools" }),
+        "1 file match tools:\nsrc/tools.ts\n(+1 weaker matches with the letters scattered across the path)",
+      );
+      // Nothing better? The scattered matches are the answer.
+      assert.match(await find({ query: "dtool" }), /^1 file match dtool:\ndocs\/the\/odd\/old\/list\.md$/);
     });
   });
 });
