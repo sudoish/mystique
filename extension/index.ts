@@ -11,7 +11,7 @@ import { StringEnum, Type } from "@earendil-works/pi-ai";
 import { defineTool, type ExtensionAPI, type ExtensionContext } from "@earendil-works/pi-coding-agent";
 import { Text } from "@earendil-works/pi-tui";
 import { type Caps, detectMode, NvimSession, renderCapabilities, type Snapshot } from "../core/nvim.ts";
-import { findRun, grepRun } from "../core/tools.ts";
+import { findRun, grepRun, testDiagnosis } from "../core/tools.ts";
 
 
 // Back-compat: the project used to be "pi-nvim-dev" with PI_NVIM_* env vars. Honor the old
@@ -472,7 +472,15 @@ const testsTool = defineTool({
 });
 
 type TestCounts = { total: number; passed: number; failed: number; skipped: number; running: number };
-type TestResult = { counts: TestCounts; failures: string[]; timed_out: boolean; unsaved?: string[]; output?: string };
+type TestResult = {
+  counts: TestCounts;
+  failures: string[];
+  timed_out: boolean;
+  unsaved?: string[];
+  output?: string;
+  errors?: string[];
+  hint?: string;
+};
 
 function formatTests(r: TestResult, notice?: string, prefix?: string) {
   const c = r.counts;
@@ -481,11 +489,8 @@ function formatTests(r: TestResult, notice?: string, prefix?: string) {
     notice,
     prefix,
     summary,
-    // A freshly-triggered run that collected nothing usually means no neotest adapter covers this
-    // path (adapters root on package.json/config, so sub-projects can be missed). Say so, don't imply success.
-    prefix && c.total === 0 && !r.timed_out
-      ? "NOTE: 0 tests collected — no test runner adapter matched this file/scope. Run the project's test command directly via bash."
-      : "",
+    // Adapter errors or an empty fresh run: say so and name the command that works (don't imply success).
+    ...testDiagnosis(r, !!prefix),
     r.unsaved?.length
       ? `WARNING: unsaved buffers (${r.unsaved.join(", ")}): tests ran against the files on disk. Run \`wa\` and re-run.`
       : "",

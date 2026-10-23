@@ -133,6 +133,32 @@ describe("mcp-nvim server over MCP", { skip: hasNvim() ? false : "nvim not insta
     assert.doesNotMatch(await ex("echo 3"), /buffers:/);
   });
 
+  test("nvim_test: an adapter that crashes reports its error and the project's test command, fast", async () => {
+    // A neotest whose adapter fails like neotest-deno on a non-Deno project: a multi-line ERROR
+    // notification (in a real UI, a hit-enter prompt that froze Neovim) and no run ever registered.
+    writeFileSync(join(cwd, "package.json"), JSON.stringify({ scripts: { test: "tsx --test *.test.ts" } }));
+    const fake =
+      "package.loaded.neotest = { state = { adapter_ids = function() return {} end, status_counts = function() end }, " +
+      "run = { run = function() vim.schedule(function() vim.notify(" +
+      "'neotest-deno: init.lua:159: could not locate root directory of sample.ts\\nstack traceback:\\n\\t[C]: in assert', " +
+      "vim.log.levels.ERROR) end) end } }";
+    await client.callTool({ name: "nvim_ex", arguments: { cmd: `lua ${fake}` } });
+    await client.callTool({ name: "nvim_ex", arguments: { cmd: "edit sample.ts" } });
+    const started = Date.now();
+    const text = textOf(await client.callTool({ name: "nvim_test", arguments: { scope: "file", timeout: 30 } }));
+    assert.ok(Date.now() - started < 3000, `took ${Date.now() - started}ms`); // no waiting out the timeout
+    assert.match(text, /test adapter errors .*\n {2}neotest-deno: .*could not locate root directory of sample\.ts\n/);
+    assert.doesNotMatch(text, /stack traceback/);
+    assert.match(text, /Run it via bash instead: npm test {3}\(scripts\.test: tsx --test \*\.test\.ts\)/);
+    // vim.notify is handed back after the grace period.
+    await sleep(2200);
+    const restored = textOf(
+      await client.callTool({ name: "nvim_ex", arguments: { cmd: "lua print(Mystique.notify_orig == nil)" } }),
+    );
+    assert.match(restored, /true/);
+    await client.callTool({ name: "nvim_ex", arguments: { cmd: "lua package.loaded.neotest = nil" } });
+  });
+
   describe("nvim_grep", { skip: hasRg() ? false : "rg not installed" }, () => {
     const grep = async (args: Record<string, unknown>) =>
       textOf(await client.callTool({ name: "nvim_grep", arguments: args }));

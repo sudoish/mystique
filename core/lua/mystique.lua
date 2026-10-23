@@ -260,6 +260,7 @@ end
 function M.detach()
   M.busy = false
   M.status(nil)
+  if M.notify_orig then vim.notify, M.notify_orig, M.captured = M.notify_orig, nil, nil end
   M.end_run()
   M.gen = M.gen + 1
   M.attached, M.shadow = {}, {}
@@ -501,12 +502,72 @@ function M.floats(max_lines)
   return out
 end
 
+
+-- While a test run is in flight, WARN/ERROR notifications (adapter crashes, "could not locate root
+-- directory", missing binaries) are captured instead of shown. Shown, a multi-line error raised
+-- during our RPC wait becomes a hit-enter prompt that freezes Neovim until the watchdog fires
+-- (the agent saw "blocked for 135s"). Captured, they go back to the agent as `errors`.
+local function capture_notify()
+  M.capture_gen, M.captured = (M.capture_gen or 0) + 1, {}
+  if M.notify_orig then return end -- already installed (e.g. nvim_test, then nvim_tests)
+  M.notify_orig = vim.notify
+  vim.notify = function(msg, level, opts)
+    if level and level >= vim.log.levels.WARN and M.captured then
+      M.captured[#M.captured + 1] = tostring(msg)
+    else
+      return M.notify_orig(msg, level, opts)
+    end
+  end
+end
+
+-- Hand vim.notify back (after a grace period: adapters often report through vim.schedule) and
+-- return what was captured: first line(s) of each message, stack traces dropped, deduplicated.
+local function release_notify()
+  local raw, seen, out = M.captured or {}, {}, {}
+  M.captured = {}
+  local gen = M.capture_gen
+  vim.defer_fn(function()
+    -- A newer run re-armed the capture meanwhile: leave it in place for that run.
+    if M.capture_gen ~= gen or not M.notify_orig then return end
+    vim.notify, M.notify_orig, M.captured = M.notify_orig, nil, nil
+  end, 2000)
+  for _, msg in ipairs(raw) do
+    msg = vim.trim((msg:gsub("\27%[[%d;]*m", ""):gsub("\nstack traceback:.*$", "")))
+    if #msg > 300 then msg = msg:sub(1, 300) .. "…" end
+    if msg ~= "" and not seen[msg] and #out < 3 then
+      seen[msg] = true
+      out[#out + 1] = msg
+    end
+  end
+  return out
+end
+
+-- The project's own test command for the current file (nearest package.json `scripts.test`), so a
+-- failed or empty neotest run points the agent at a command that works instead of a dead end.
+local function test_command_hint()
+  local file = api.nvim_buf_get_name(0)
+  local from = file ~= "" and vim.fs.dirname(file) or fn.getcwd()
+  local pkg = vim.fs.find("package.json", { upward = true, path = from, stop = vim.uv.os_homedir() })[1]
+  if not pkg then return nil end
+  local ok, json = pcall(vim.json.decode, table.concat(fn.readfile(pkg), "\n"))
+  if not (ok and type(json) == "table" and type(json.scripts) == "table" and json.scripts.test) then return nil end
+  -- Compare real paths: cwd and the package dir may differ only by a symlink (/var vs /private/var).
+  local real = function(p) return vim.uv.fs_realpath(p) or p end
+  local root, dir = real(fn.getcwd()), real(vim.fs.dirname(pkg))
+  local cd = ""
+  if dir ~= root then
+    cd = "cd " .. ((vim.fs.relpath and vim.fs.relpath(root, dir)) or dir) .. " && "
+  end
+  return ("%snpm test   (scripts.test: %s)"):format(cd, json.scripts.test)
+end
+
 ---------------------------------------------------------------------------
 -- Tests (neotest): wait for runs to finish, then report counts and failures
 ---------------------------------------------------------------------------
 function M.tests(timeout_ms)
   local ok, neotest = pcall(require, "neotest")
   if not ok or not neotest.state then error("neotest is not loaded (it loads after an LSP attaches to a buffer)") end
+  if not M.notify_orig then capture_notify() end -- nvim_tests on its own; nvim_test armed it already
   local function counts()
     local agg = { total = 0, passed = 0, failed = 0, skipped = 0, running = 0 }
     for _, id in ipairs(neotest.state.adapter_ids() or {}) do
@@ -522,6 +583,8 @@ function M.tests(timeout_ms)
     local c = counts()
     if c.running > 0 then seen_running = true end
     if seen_running then return c.running == 0 end
+    -- An adapter that failed before registering (bad root, missing binary) never shows "running".
+    if M.captured and #M.captured > 0 and vim.uv.now() - start > 300 then return true end
     return vim.uv.now() - start > 3000
   end, 100)
   vim.wait(300) -- let diagnostics from results land
@@ -551,6 +614,9 @@ function M.tests(timeout_ms)
     end
   end
   local res = { counts = c, failures = failures, timed_out = c.running > 0 }
+  local errors = release_notify()
+  if #errors > 0 then res.errors = errors end
+  if c.total == 0 or #errors > 0 then res.hint = test_command_hint() end
   local unsaved = {}
   for _, info in ipairs(fn.getbufinfo({ buflisted = 1 })) do
     if info.changed == 1 and info.name ~= "" then unsaved[#unsaved + 1] = rel(info.name) end
@@ -720,6 +786,7 @@ function M.test_run(scope)
 
   if has_module("neotest") then
     local neotest = require("neotest")
+    capture_notify() -- adapter errors become data, not a hit-enter prompt (see capture_notify)
     local ok, err = pcall(function()
       if scope == "file" then
         neotest.run.run(vim.fn.expand("%:p"))
@@ -729,7 +796,10 @@ function M.test_run(scope)
         neotest.run.run()
       end
     end)
-    if not ok then return { backend = "neotest", scope = scope, started = false, err = tostring(err) } end
+    if not ok then
+      release_notify()
+      return { backend = "neotest", scope = scope, started = false, err = tostring(err) }
+    end
     return { backend = "neotest", scope = scope, started = true }
   end
 

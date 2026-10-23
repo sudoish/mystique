@@ -168,13 +168,35 @@ export async function check(session: NvimSession): Promise<string> {
   return r.items.length ? `${head}\n${r.items.join("\n")}` : `${head}\nno errors or warnings`;
 }
 
-interface TestCounts { total: number; passed: number; failed: number; skipped: number; running: number }
+export interface TestCounts { total: number; passed: number; failed: number; skipped: number; running: number }
 interface TestResult {
   counts: TestCounts;
   failures: string[];
   timed_out: boolean;
   unsaved?: string[];
   output?: string;
+  errors?: string[];
+  hint?: string;
+}
+
+/**
+ * Why a run yielded nothing trustworthy, and what to run instead. Adapter errors (captured from
+ * vim.notify during the run) beat the generic "0 collected" note; `hint` is the project's own
+ * test command, found from the nearest package.json.
+ */
+export function testDiagnosis(
+  r: { counts: TestCounts; timed_out: boolean; errors?: string[]; hint?: string },
+  freshRun: boolean,
+): string[] {
+  const out: string[] = [];
+  if (r.errors?.length) {
+    out.push("test adapter errors (results below are not trustworthy):", ...r.errors.map((e) => `  ${e}`));
+  } else if (freshRun && r.counts.total === 0 && !r.timed_out) {
+    out.push("NOTE: 0 tests collected — no test adapter matched this file/scope.");
+  }
+  if (!out.length) return out;
+  out.push(r.hint ? `Run it via bash instead: ${r.hint}` : "Run the project's test command directly via bash.");
+  return out;
 }
 
 function formatTests(r: TestResult, prefix?: string): string {
@@ -183,9 +205,7 @@ function formatTests(r: TestResult, prefix?: string): string {
   return [
     prefix,
     summary,
-    prefix && c.total === 0 && !r.timed_out
-      ? "NOTE: 0 tests collected — no test runner adapter matched this file/scope. Run the project's test command directly via bash."
-      : "",
+    ...testDiagnosis(r, !!prefix),
     r.unsaved?.length
       ? `WARNING: unsaved buffers (${r.unsaved.join(", ")}): tests ran against the files on disk. Save and re-run.`
       : "",
