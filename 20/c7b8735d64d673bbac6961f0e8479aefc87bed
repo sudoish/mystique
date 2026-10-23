@@ -1,0 +1,27 @@
+claude/hooks.test.mjs
+  s_abee57a03efe65::t_65534d2906118d 1,5-8,44-92
+claude/hooks/nvim-context.mjs
+  s_abee57a03efe65::t_ba5929b7a894fb 1-94
+claude/settings.json
+  s_abee57a03efe65::t_e2b13b9053b743 7-20
+extension/index.ts
+  s_abee57a03efe65::t_d40455b74cad64 6,12-13
+mcp-nvim/index.test.ts
+  s_abee57a03efe65::t_734158ba11f97b 8,54,68,86-87,98-110
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.7.5",
+  "base_commit_sha": "20c7b8735d64d673bbac6961f0e8479aefc87bed",
+  "prompts": {},
+  "sessions": {
+    "s_abee57a03efe65": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "2319421d-700f-4f1c-84ab-2cbc79cc436d",
+        "model": "claude-fable-5-1"
+      },
+      "human_author": "Thiago Pacheco <hi@sudoish.com>"
+    }
+  }
+}
