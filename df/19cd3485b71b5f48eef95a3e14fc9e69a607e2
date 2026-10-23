@@ -1,0 +1,32 @@
+README.md
+  h_8a472ace01776f 11-12,124
+claude/README.md
+  h_8a472ace01776f 22-24,29-30,33-43,45-49,52
+claude/hooks.test.mjs
+  h_8a472ace01776f 9,49,52,56,60,62,65,67,80,95-148
+claude/hooks/active.mjs
+  h_8a472ace01776f 1-17
+claude/hooks/guard-bash.mjs
+  h_8a472ace01776f 13,26
+claude/hooks/nvim-context.mjs
+  h_8a472ace01776f 3,12-13,16,20-22,28-32,50-51,65,67,69
+claude/hooks/redirect-to-nvim.mjs
+  h_8a472ace01776f 7,11-12,24
+claude/install.mjs
+  h_8a472ace01776f 1-132
+mcp-nvim/index.test.ts
+  h_8a472ace01776f 47-59
+mcp-nvim/index.ts
+  h_8a472ace01776f 69-71,105,283
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.7.5",
+  "base_commit_sha": "df19cd3485b71b5f48eef95a3e14fc9e69a607e2",
+  "prompts": {},
+  "humans": {
+    "h_8a472ace01776f": {
+      "author": "Thiago Pacheco <hi@sudoish.com>"
+    }
+  }
+}
