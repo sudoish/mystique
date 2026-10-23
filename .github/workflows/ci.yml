@@ -102,6 +102,41 @@ jobs:
         working-directory: mcp-nvim
         run: npm test
 
+
+  install:
+    name: Installer (fresh clone → install.sh → doctor)
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: "22"
+
+      - name: Install Neovim + ripgrep
+        run: |
+          curl -fsSL -o nvim.tar.gz https://github.com/neovim/neovim/releases/download/stable/nvim-linux-x86_64.tar.gz
+          tar xzf nvim.tar.gz
+          echo "$PWD/nvim-linux-x86_64/bin" >> "$GITHUB_PATH"
+          sudo apt-get install -y ripgrep
+
+      - name: CLI unit tests
+        run: node --test bin/
+
+      # A brand-new user: empty HOME, clone of this commit piped through `sh` like curl | sh.
+      # No agent is installed on the runner, so the only acceptable doctor failure is "agent".
+      - name: Fresh install
+        run: |
+          export HOME="$RUNNER_TEMP/home" && mkdir -p "$HOME" && cd "$HOME"
+          MYSTIQUE_REPO="$GITHUB_WORKSPACE" sh -s < "$GITHUB_WORKSPACE/install.sh" || true
+          node "$HOME/.local/share/mystique/bin/mystique.mjs" doctor --json > doctor.json || true
+          node -e '
+            const checks = require(process.env.HOME + "/doctor.json");
+            const bad = checks.filter((c) => c.level === "fail" && c.name !== "agent");
+            console.log(checks.map((c) => `${c.level} ${c.name}: ${c.detail}`).join("\n"));
+            if (bad.length) { console.error("doctor failures:", bad); process.exit(1); }
+          '
+
   claude-hooks:
     name: Claude hooks (bash policy tests)
     runs-on: ubuntu-latest

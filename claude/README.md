@@ -25,6 +25,9 @@ Scaffolds CLAUDE_CODE_PLAN milestones 3 (enforcement) and 4 (playbook). The piec
 
 ## Setup
 
+Usually you want the top-level installer (`sh install.sh`, see the main README), which
+runs this for you. To set up only Claude Code from a checkout:
+
 ```bash
 node claude/install.mjs              # install / update (user scope: every project)
 node claude/install.mjs --uninstall  # remove everything it added

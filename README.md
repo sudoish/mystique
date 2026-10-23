@@ -9,7 +9,7 @@ code through a **live, visible Neovim** instead of writing files behind your bac
 Like its namesake, Mystique adapts to whatever it finds: it uses your attached LSP servers, your formatter
 (conform, else LSP, else `gq`), and your test runner (neotest, else vim-test) — no project-specific wiring.
 And it is agent-agnostic: it drives [pi](https://github.com/earendil-works/pi) and Claude Code
-(one command: `node claude/install.mjs`, see [claude/](claude/README.md)).
+(one paste to install, see [Install](#install)).
 
 ## Why
 
@@ -23,7 +23,8 @@ And it is agent-agnostic: it drives [pi](https://github.com/earendil-works/pi) a
 ## Requirements
 
 - **Neovim** 0.10+ (0.11+ recommended).
-- **A coding agent** — currently [pi](https://github.com/earendil-works/pi).
+- **A coding agent**: [pi](https://github.com/earendil-works/pi) or Claude Code.
+- **Node.js** 20+ (to run the installer and the Claude Code MCP server). `mystique doctor` checks all of this.
 - **One way for Mystique to reach a Neovim**, in priority order:
   - **Embedded** — run pi inside a Neovim `:terminal` split (e.g. with
     [sidekick.nvim](https://github.com/folke/sidekick.nvim)). Mystique drives *your* editor: your buffers,
@@ -37,31 +38,40 @@ installed copy never cripples plain pi.
 
 ## Install
 
+**Easiest: paste this into pi or Claude Code** and let the agent do it:
+
+```text
+Install Mystique for me: clone https://github.com/sudoish/mystique into ~/.local/share/mystique
+(or git pull if it's already there), run `sh ~/.local/share/mystique/install.sh`, then walk me
+through fixing every ✖ or ! item that `mystique doctor` reports until it's all green.
+```
+
+**Or run it yourself:**
+
 ```bash
-git clone https://github.com/<you>/mystique.git ~/dev/mystique
-cd ~/dev/mystique/core && npm install && cd ../extension && npm install
+git clone https://github.com/sudoish/mystique ~/.local/share/mystique && sh ~/.local/share/mystique/install.sh
 ```
 
-Load it for a single pi run:
+The installer installs the dependencies, enables Mystique for every agent it finds (pi via
+`pi install`, Claude Code via a user-scope MCP server + hooks), links a `mystique` CLI into
+`~/.local/bin`, and finishes with **`mystique doctor`**, which checks Node ≥ 20, Neovim ≥ 0.10, that
+the Lua engine loads, ripgrep, the dependencies, each agent's integration (including duplicate
+loads) and whether a Neovim is reachable, with a fix for anything missing. Re-running it is safe.
 
 ```bash
-pi -e ~/dev/mystique/extension/index.ts
+mystique doctor                    # check prerequisites + integrations (exit 1 on problems)
+mystique install [pi] [claude]     # (re)enable for specific agents
+mystique update                    # git pull + refresh deps and integrations
+mystique uninstall [pi] [claude]   # remove it again (Claude settings are backed up first)
 ```
 
-Or make it the default for every pi session — add it to `~/.pi/agent/settings.json`:
+pi only, without the CLI: `pi install git:github.com/sudoish/mystique`.
 
-```json
-{ "extensions": ["~/dev/mystique/extension/index.ts"] }
-```
+Then run your agent **inside a Neovim `:terminal`** (or with `MYSTIQUE_SOCKET`, or in herdr). With
+[sidekick.nvim](https://github.com/folke/sidekick.nvim) that's just `cli = { tools = { pi = { cmd = { "pi" } },
+claude = { cmd = { "claude" } } } }`. Outside Neovim both agents behave exactly as before.
 
-With [sidekick.nvim](https://github.com/folke/sidekick.nvim) you can register pi as a CLI tool so it launches
-inside your editor:
-
-```lua
-opts = { cli = { tools = {
-  ["pi"] = { cmd = { "pi", "-e", vim.fn.expand("~/dev/mystique/extension/index.ts") } },
-} } }
-```
+Working on Mystique itself? Run `sh install.sh` from your checkout to install it in place.
 
 ## Usage
 

@@ -5,7 +5,7 @@
  *   node claude/install.mjs              install / update
  *   node claude/install.mjs --uninstall  remove everything it added
  *
- * 1. Installs core/ and mcp-nvim/ dependencies when missing.
+ * 1. Installs the repo's dependencies (root package.json) when missing.
  * 2. Registers the `nvim` MCP server at user scope (`claude mcp add -s user`).
  * 3. Merges into ~/.claude/settings.json (backup first): the context hook
  *    (SessionStart/UserPromptSubmit), the PreToolUse guards, and `mcp__nvim` in
@@ -85,25 +85,32 @@ function sh(cmd, args, opts = {}) {
   return { ok: r.status === 0, out: `${r.stdout ?? ""}${r.stderr ?? ""}`.trim() };
 }
 
-function main() {
-  const uninstall = process.argv.includes("--uninstall");
-  const root = join(dirname(fileURLToPath(import.meta.url)), "..");
-  const settingsFile = join(process.env.CLAUDE_CONFIG_DIR || join(homedir(), ".claude"), "settings.json");
-  const log = (m) => process.stdout.write(`mystique: ${m}\n`);
+/** tsx to run the TypeScript MCP server: the shared root install, else mcp-nvim's own (dev checkouts). */
+export function tsxPath(root) {
+  for (const dir of [root, join(root, "mcp-nvim")]) {
+    const bin = join(dir, "node_modules", ".bin", "tsx");
+    if (existsSync(bin)) return bin;
+  }
+  return undefined;
+}
 
+export function claudeSettingsFile() {
+  return join(process.env.CLAUDE_CONFIG_DIR || join(homedir(), ".claude"), "settings.json");
+}
+
+/** Install (or with `uninstall`, remove) Mystique for Claude Code at user scope. Throws on failure. */
+export function installClaude({ root, uninstall = false, log = () => { } }) {
+  const settingsFile = claudeSettingsFile();
   if (!sh("claude", ["--version"]).ok) throw new Error("`claude` CLI not found on PATH");
 
   sh("claude", ["mcp", "remove", "-s", "user", SERVER]); // idempotent: drop any previous registration
   if (!uninstall) {
-    for (const pkg of ["core", "mcp-nvim"]) {
-      if (!existsSync(join(root, pkg, "node_modules"))) {
-        log(`installing ${pkg} dependencies…`);
-        const r = sh("npm", ["install", "--no-audit", "--no-fund"], { cwd: join(root, pkg) });
-        if (!r.ok) throw new Error(`npm install failed in ${pkg}:\n${r.out}`);
-      }
+    if (!tsxPath(root)) {
+      log("installing dependencies…");
+      const r = sh("npm", ["install", "--no-audit", "--no-fund", "--omit=peer"], { cwd: root });
+      if (!r.ok) throw new Error(`npm install failed:\n${r.out}`);
     }
-    const tsx = join(root, "mcp-nvim", "node_modules", ".bin", "tsx");
-    const r = sh("claude", ["mcp", "add", "-s", "user", SERVER, "--", tsx, join(root, "mcp-nvim", "index.ts")]);
+    const r = sh("claude", ["mcp", "add", "-s", "user", SERVER, "--", tsxPath(root), join(root, "mcp-nvim", "index.ts")]);
     if (!r.ok) throw new Error(`claude mcp add failed:\n${r.out}`);
     log(`registered MCP server "${SERVER}" (user scope)`);
   } else {
@@ -116,15 +123,17 @@ function main() {
   if (existsSync(settingsFile)) copyFileSync(settingsFile, `${settingsFile}.bak-mystique`);
   writeFileSync(settingsFile, `${JSON.stringify(after, null, 2)}\n`);
   log(`${uninstall ? "removed hooks from" : "merged hooks + permissions into"} ${settingsFile} (backup: settings.json.bak-mystique)`);
-  if (!uninstall) {
-    log("done. Run `claude` inside a Neovim :terminal (or set MYSTIQUE_SOCKET) and it drives that editor;");
-    log("anywhere else Claude Code behaves as usual. MYSTIQUE_POLICY=off lifts enforcement.");
-  }
 }
 
 if (process.argv[1] && import.meta.url === pathToFileURL(process.argv[1]).href) {
   try {
-    main();
+    const uninstall = process.argv.includes("--uninstall");
+    installClaude({
+      root: join(dirname(fileURLToPath(import.meta.url)), ".."),
+      uninstall,
+      log: (m) => process.stdout.write(`mystique: ${m}\n`),
+    });
+    if (!uninstall) process.stdout.write("mystique: done. Run `claude` inside a Neovim :terminal; elsewhere nothing changes.\n");
   } catch (e) {
     process.stderr.write(`mystique: ${e.message}\n`);
     process.exit(1);
