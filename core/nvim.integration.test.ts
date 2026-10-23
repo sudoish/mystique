@@ -94,4 +94,24 @@ describe("NvimSession against a headless Neovim", { skip: hasNvim() ? false : "n
     const snap = await session.snapshot();
     assert.match(snap.ctx, /salutation/);
   });
+
+  test("taking focus from a terminal is not reported as human activity on the next tool", async () => {
+    // pi runs in a :terminal split; the first tool of a run pulls focus into the editor. Neovim only
+    // leaves terminal mode on its next main-loop turn, so end_tool used to record mode "t" and the
+    // second tool reported "mode is now n": a false "the user interacted" that skipped actions.
+    await session.ex("edit! sample.ts | vsplit | terminal"); // edit!: an earlier test left sample.ts modified
+    await session.ex("startinsert");
+    await sleep(200);
+    assert.equal(await session.lua<string>("return vim.api.nvim_get_mode().mode"), "t", "setup: in terminal mode");
+    // One Lua call, no main-loop turn in between: the state a real (UI-attached) editor is in when the
+    // first tool ends, terminal mode not yet left. Headless drops it between separate RPC calls.
+    await session.lua("Mystique.start_tool('first'); Mystique.end_tool()");
+    await sleep(100); // the main loop turns between tools, as it does for real
+    const activity = await session.startTool("second");
+    await session.endTool();
+    assert.equal(activity, undefined, `unexpected activity: ${activity}`);
+    await session.lua(
+      "for _, w in ipairs(vim.api.nvim_list_wins()) do if vim.bo[vim.api.nvim_win_get_buf(w)].buftype == 'terminal' then vim.api.nvim_win_close(w, true) end end",
+    );
+  });
 });

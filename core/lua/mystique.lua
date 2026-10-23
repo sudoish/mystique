@@ -274,7 +274,14 @@ end
 ---------------------------------------------------------------------------
 local function current_state()
   local c = api.nvim_win_get_cursor(0)
-  return { buf = api.nvim_get_current_buf(), line = c[1], col = c[2], mode = api.nvim_get_mode().mode }
+  local mode = api.nvim_get_mode().mode
+  -- Leaving a terminal only drops terminal mode on the next main-loop turn, so right after we take
+  -- focus (or at the end of a tool that never yielded) the mode still reads "t" in the editor window.
+  -- Recorded like that, the next tool saw "mode is now n" and blamed the human (false activity).
+  if mode:sub(1, 1) == "t" or mode:sub(1, 2) == "nt" then
+    if not is_term_win(api.nvim_get_current_win()) then mode = "n" end
+  end
+  return { buf = api.nvim_get_current_buf(), line = c[1], col = c[2], mode = mode }
 end
 
 -- Called when a pi tool starts. Returns what the human did since the last tool finished, or nil.
