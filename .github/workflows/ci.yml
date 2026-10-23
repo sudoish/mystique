@@ -67,6 +67,41 @@ jobs:
         working-directory: extension
         run: npm run check
 
+  mcp-nvim:
+    name: MCP server (typecheck + tests)
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: "22"
+          cache: npm
+          cache-dependency-path: mcp-nvim/package-lock.json
+
+      - name: Install Neovim
+        run: |
+          curl -fsSL -o nvim.tar.gz https://github.com/neovim/neovim/releases/download/stable/nvim-linux-x86_64.tar.gz
+          tar xzf nvim.tar.gz
+          echo "$PWD/nvim-linux-x86_64/bin" >> "$GITHUB_PATH"
+
+      # mcp-nvim imports ../core, whose nvim.ts imports `neovim`; install core so it resolves.
+      - name: Install core
+        working-directory: core
+        run: npm ci
+
+      - name: Install
+        working-directory: mcp-nvim
+        run: npm ci
+
+      - name: Typecheck
+        working-directory: mcp-nvim
+        run: npm run check
+
+      - name: Test
+        working-directory: mcp-nvim
+        run: npm test
+
   demo-tests:
     name: Demo fixtures (jest TDD flow)
     runs-on: ubuntu-latest

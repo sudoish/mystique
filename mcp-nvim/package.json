@@ -1,0 +1,25 @@
+{
+  "name": "@mystique/mcp-nvim",
+  "private": true,
+  "version": "0.1.0",
+  "type": "module",
+  "description": "MCP server exposing Mystique's nvim_* tools (backed by @mystique/core) so any MCP-capable agent — Claude Code, etc. — can drive a live Neovim.",
+  "bin": {
+    "mystique-mcp-nvim": "./index.ts"
+  },
+  "scripts": {
+    "check": "tsc --noEmit",
+    "test": "tsx --test *.test.ts",
+    "start": "tsx index.ts"
+  },
+  "dependencies": {
+    "@modelcontextprotocol/sdk": "^1.32.1",
+    "neovim": "^5.5.0",
+    "zod": "^3.23.8"
+  },
+  "devDependencies": {
+    "@types/node": "^22.20.5",
+    "tsx": "^4.23.15",
+    "typescript": "^5.9.3"
+  }
+}
