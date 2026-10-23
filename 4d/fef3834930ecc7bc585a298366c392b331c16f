@@ -1,0 +1,18 @@
+README.md
+  h_8a472ace01776f 125
+eval/README.md
+  h_8a472ace01776f 8-9
+eval/RESULTS.md
+  h_8a472ace01776f 1-53
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.7.5",
+  "base_commit_sha": "4dfef3834930ecc7bc585a298366c392b331c16f",
+  "prompts": {},
+  "humans": {
+    "h_8a472ace01776f": {
+      "author": "Thiago Pacheco <hi@sudoish.com>"
+    }
+  }
+}
