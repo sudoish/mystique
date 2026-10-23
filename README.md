@@ -122,7 +122,7 @@ through `nvim_input`, the same path as real typing, so everything renders live.
 ## Roadmap
 
 - Claude Code support via an MCP server + hooks (see [CLAUDE_CODE_PLAN.md](CLAUDE_CODE_PLAN.md)).
-- Run the [evaluation suite](eval/) on real models and publish the tokens/tool-call comparison against plain pi.
+- Expand the [evaluation suite](eval/) (more multi-file tasks, cost reporting). First results: [eval/RESULTS.md](eval/RESULTS.md).
 
 ## Demo
 

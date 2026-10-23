@@ -5,6 +5,8 @@ tokens, tool-call count, task success, and wall time. The goal is to show whethe
 driving a live Neovim is competitive on tokens/tool-calls while keeping success at
 100%.
 
+**Latest results: [RESULTS.md](RESULTS.md).**
+
 ## How it works
 
 For each **task × mode × trial** the harness (`src/run.ts`):
