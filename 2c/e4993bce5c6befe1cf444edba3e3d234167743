@@ -1,0 +1,34 @@
+.github/workflows/ci.yml
+  h_8a472ace01776f 105-118
+CLAUDE_CODE_PLAN.md
+  h_8a472ace01776f 90-91
+README.md
+  h_8a472ace01776f 124,142
+claude/CLAUDE.md
+  h_8a472ace01776f 1-36
+claude/README.md
+  h_8a472ace01776f 1-52
+claude/hooks.test.mjs
+  h_8a472ace01776f 1-38
+claude/hooks/bash-policy.mjs
+  h_8a472ace01776f 1-37
+claude/hooks/guard-bash.mjs
+  h_8a472ace01776f 1-42
+claude/hooks/redirect-to-nvim.mjs
+  h_8a472ace01776f 1-37
+claude/package.json
+  h_8a472ace01776f 1-9
+claude/settings.json
+  h_8a472ace01776f 1-22
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.7.5",
+  "base_commit_sha": "2ce4993bce5c6befe1cf444edba3e3d234167743",
+  "prompts": {},
+  "humans": {
+    "h_8a472ace01776f": {
+      "author": "Thiago Pacheco <hi@sudoish.com>"
+    }
+  }
+}
