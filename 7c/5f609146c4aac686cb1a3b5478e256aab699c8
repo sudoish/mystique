@@ -1,0 +1,39 @@
+mcp-nvim/tsconfig.json
+  s_1b069e4f66bbbb::t_e0e819fad8ef87 1-20
+mcp-nvim/.gitignore
+  s_1b069e4f66bbbb::t_e0e819fad8ef87 1-2
+mcp-nvim/index.test.ts
+  s_2ac552630ed333::t_ceb0e77435d272 1-103
+mcp-nvim/package-lock.json
+  s_1b069e4f66bbbb::t_8f514501a6c104 1-2080
+core/tools.ts
+  s_1b069e4f66bbbb::t_5252c6f86a9fdd 1-159
+mcp-nvim/index.ts
+  s_1b069e4f66bbbb::t_e0f82494cd54d9 1-207
+mcp-nvim/package.json
+  s_1b069e4f66bbbb::t_e5d74543f6a5fa 1-25
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.7.5",
+  "base_commit_sha": "7c5f609146c4aac686cb1a3b5478e256aab699c8",
+  "prompts": {},
+  "sessions": {
+    "s_1b069e4f66bbbb": {
+      "agent_id": {
+        "tool": "pi",
+        "id": "01a16474-ac4b-771f-b7e3-92fb8cb757dc",
+        "model": "claude-opus-4-8"
+      },
+      "human_author": "Thiago Pacheco <hi@sudoish.com>"
+    },
+    "s_2ac552630ed333": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "389a3850-d20e-4d9e-91ec-435347894953",
+        "model": "claude-fable-5-1"
+      },
+      "human_author": "Thiago Pacheco <hi@sudoish.com>"
+    }
+  }
+}
