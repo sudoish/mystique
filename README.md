@@ -1,44 +1,50 @@
 # Mystique
 
-**Let any coding agent shapeshift into a Neovim power user.**
+**Your coding agent edits code through your Neovim, live, instead of writing files behind your back.**
 
-Mystique turns your coding agent into a Neovim operator: it navigates, searches, edits and verifies
-code through a **live, visible Neovim** instead of writing files behind your back. You watch every motion,
-`:` command, LSP rename and test run happen in your editor, in real time.
+Mystique gives an AI coding agent ([pi](https://github.com/earendil-works/pi) or Claude Code) a set of
+`nvim_*` tools and takes away its direct file access. Every search, edit, rename, format and test run
+then happens in a Neovim you can see, as motions, `:` commands and LSP actions, using your own setup.
 
-Like its namesake, Mystique adapts to whatever it finds: it uses your attached LSP servers, your formatter
-(conform, else LSP, else `gq`), and your test runner (neotest, else vim-test) — no project-specific wiring.
-And it is agent-agnostic: it drives [pi](https://github.com/earendil-works/pi) and Claude Code
-(one paste to install, see [Install](#install)).
+## Why it matters
 
-## Why
+- **You see every change as it happens.** Edits land in buffers you're watching, not in files you have to
+  diff afterwards. Undo, your git tools and your usual review habits all still work.
+- **The agent uses real editor tools.** A rename is an LSP rename across the project, not find-and-replace on
+  text. Formatting goes through your formatter and tests through your test runner (conform/LSP/`gq`,
+  neotest/vim-test), all discovered automatically with nothing to configure per project.
+- **The editor is shared.** If you type, move the cursor or switch buffers between the agent's steps,
+  Mystique notices. The agent's next cursor-dependent action is skipped and it re-plans around what you did.
+- **The same tools work in pi and Claude Code.** Both agents get the same playbook and the same guardrails.
 
-- **Edit through the editor, not the filesystem.** Every change happens in a Neovim buffer you can see and undo.
-- **Config-agnostic.** Mystique discovers your LSP, formatter and test runner and uses them. It does not need
-  your personal keymaps.
-- **Shared.** You and the agent share one editor. Edits, cursor moves and mode changes you make between the
-  agent's tool calls are detected; cursor-sensitive actions pause and the agent re-plans around you.
-- **Token-efficient.** The agent gets compact, structured snapshots and changed-line diffs, not whole-file dumps.
+## How it works
 
-## Requirements
+```
+ agent (pi / Claude Code)
+   │  nvim_keys · nvim_ex · nvim_lsp · nvim_grep · nvim_test · …     builtin read/edit/write: blocked
+   ▼
+ Mystique ── msgpack-RPC ──▶ your Neovim  (+ a small Lua helper, core/lua/mystique.lua)
+   ▲                              │
+   └── compact snapshot ◀─────────┘   mode, file:line:col, cursor context, changed lines, diagnostics
+```
 
-- **Neovim** 0.10+ (0.11+ recommended).
-- **A coding agent**: [pi](https://github.com/earendil-works/pi) or Claude Code.
-- **Node.js** 20+ (to run the installer and the Claude Code MCP server). `mystique doctor` checks all of this.
-- **One way for Mystique to reach a Neovim**, in priority order:
-  - **Embedded** — run pi inside a Neovim `:terminal` split (e.g. with
-    [sidekick.nvim](https://github.com/folke/sidekick.nvim)). Mystique drives *your* editor: your buffers,
-    your LSP, your layout. `$NVIM` is detected automatically.
-  - **External** — point it at an editor you started with `nvim --listen <sock>`, via `MYSTIQUE_SOCKET=<sock>`.
-  - **herdr** — inside a [herdr](https://github.com/earendil-works/herdr) pane, Mystique splits the pane and
-    spawns its own `nvim --listen` instance.
-
-Without any of these, Mystique stays inert: the built-in file tools and bash keep working, so a globally
-installed copy never cripples plain pi.
+1. **It connects to a Neovim.** It uses whichever it finds first: the editor the agent is running inside
+   (a `:terminal`, detected via `$NVIM`), `MYSTIQUE_SOCKET=<sock>` for an `nvim --listen <sock>` you
+   started, or a new pane in [herdr](https://github.com/earendil-works/herdr). With none of these it stays
+   **inert** and your agent behaves exactly as before.
+2. **It tells the agent about your editor.** The agent gets a short playbook, the backends your config
+   provides (LSP, formatter, test runner, treesitter) and a cheat sheet of your keymaps.
+3. **It keeps edits inside the editor.** Builtin file tools are turned off (pi) or blocked by hooks
+   (Claude Code). Bash commands that would bypass the editor (`sed -i`, `cat`, `rg`, redirects) are
+   refused, and all buffers are saved before any allowed bash command.
+4. **The agent works through `nvim_*` tools.** Keystrokes go through `nvim_input` like real typing. Each
+   call returns a compact snapshot of the editor state rather than whole files.
 
 ## Install
 
-**Easiest: paste this into pi or Claude Code** and let the agent do it:
+You need Neovim 0.10+, Node.js 20+, and pi or Claude Code. ripgrep is recommended.
+
+**Easiest: paste this into pi or Claude Code:**
 
 ```text
 Install Mystique for me: clone https://github.com/sudoish/mystique into ~/.local/share/mystique
@@ -49,118 +55,86 @@ through fixing every ✖ or ! item that `mystique doctor` reports until it's all
 **Or run it yourself:**
 
 ```bash
-git clone https://github.com/sudoish/mystique ~/.local/share/mystique && sh ~/.local/share/mystique/install.sh
+curl -fsSL https://raw.githubusercontent.com/sudoish/mystique/main/install.sh | sh
 ```
 
-The installer installs the dependencies, enables Mystique for every agent it finds (pi via
-`pi install`, Claude Code via a user-scope MCP server + hooks), links a `mystique` CLI into
-`~/.local/bin`, and finishes with **`mystique doctor`**, which checks Node ≥ 20, Neovim ≥ 0.10, that
-the Lua engine loads, ripgrep, the dependencies, each agent's integration (including duplicate
-loads) and whether a Neovim is reachable, with a fix for anything missing. Re-running it is safe.
+The installer clones the repo to `~/.local/share/mystique`, installs its dependencies and enables Mystique
+for each agent it finds: pi through `pi install`, Claude Code through a user-scope MCP server plus hooks
+(your settings are backed up first). It then links a `mystique` command into `~/.local/bin` and ends by
+running **`mystique doctor`**. The doctor checks every prerequisite and integration and prints the fix
+for anything missing. You can re-run the installer at any time.
 
 ```bash
-mystique doctor                    # check prerequisites + integrations (exit 1 on problems)
+mystique doctor                    # check prerequisites + integrations
 mystique install [pi] [claude]     # (re)enable for specific agents
-mystique update                    # git pull + refresh deps and integrations
-mystique uninstall [pi] [claude]   # remove it again (Claude settings are backed up first)
+mystique update                    # pull the latest version, refresh everything
+mystique uninstall [pi] [claude]   # remove it again
 ```
 
 pi only, without the CLI: `pi install git:github.com/sudoish/mystique`.
 
-Then run your agent **inside a Neovim `:terminal`** (or with `MYSTIQUE_SOCKET`, or in herdr). With
-[sidekick.nvim](https://github.com/folke/sidekick.nvim) that's just `cli = { tools = { pi = { cmd = { "pi" } },
-claude = { cmd = { "claude" } } } }`. Outside Neovim both agents behave exactly as before.
+## Use
 
-Working on Mystique itself? Run `sh install.sh` from your checkout to install it in place.
+Run your agent **inside Neovim**, for example in a `:terminal` split or via
+[sidekick.nvim](https://github.com/folke/sidekick.nvim), then give it a task:
 
-## Usage
-
-Start pi inside your editor (or in herdr) and give it a task. Mystique connects on the first tool call (or
-run `/nvim`) and the agent works in a Neovim window beside your pi terminal.
-
-```
+```text
 Rename calc to cartTotal everywhere, fix the type errors, add withDiscount(total, pct) to
 src/cart.ts, then run the tests.
 ```
 
-The agent will prefer the smartest, shortest path: LSP rename and code actions, `nvim_format`,
-`:cdo`/`:g`/`:norm` for structural edits, text objects and dot-repeat for local ones, and `nvim_test`
-to run tests and read results — iterating red → green in your editor.
+The agent picks the shortest editor-native path it can: an LSP rename, `:cdo`/`:g`/`:norm` for
+structural edits, text objects and `.` for local ones, `nvim_format`, and `nvim_test` until the tests
+pass.
 
-### Commands
+**Tools:** `nvim_keys`, `nvim_ex`, `nvim_insert`, `nvim_view`, `nvim_grep`, `nvim_find`, `nvim_lsp`,
+`nvim_format`, `nvim_test`, `nvim_tests`, `nvim_check`, `nvim_screen`, and `nvim_capabilities` (Claude Code).
 
-| Command | Effect |
+**pi commands:** `/nvim` (connect), `/nvim-keymaps`, `/nvim-capabilities`, `/nvim-speed demo|fast`
+(paced, watchable typing or instant), `/nvim-close`.
+
+| Environment variable | Effect |
 |---|---|
-| `/nvim` | Connect: the host editor, `MYSTIQUE_SOCKET`, or a new herdr pane |
-| `/nvim-keymaps` | Show the cheat sheet of your mappings given to the agent |
-| `/nvim-capabilities` | Show the capability manifest (format/test/LSP/…) given to the agent |
-| `/nvim-speed demo\|fast` | Paced, watchable typing (default) or instant |
-| `/nvim-close` | Close a herdr-spawned Neovim, or detach from the host editor |
+| `MYSTIQUE_SOCKET=<sock>` | Drive an `nvim --listen <sock>` you started |
+| `MYSTIQUE_POLICY=off` | Keep the agent's builtin file tools (no blocking) |
+| `MYSTIQUE_SPEED=fast` | Instant typing instead of paced (pi) |
+| `MYSTIQUE_AUTOSTART=0` | Don't connect when pi's TUI starts |
+| `MYSTIQUE_REFOCUS=0` | Leave the cursor in the editor after each run (embedded pi) |
+| `MYSTIQUE_CLOSE=1` | Close a herdr-spawned Neovim when the session ends |
+| `MYSTIQUE_KEYMAP_DENY=<regex>` | Which mappings to leave out of the keymap cheat sheet |
 
-### Environment
+## Status
 
-| Variable | Effect |
-|---|---|
-| `MYSTIQUE_SOCKET=<sock>` | Attach to an existing `nvim --listen <sock>` instead of spawning one |
-| `MYSTIQUE_SPEED=fast` | Start in fast (instant) typing mode |
-| `MYSTIQUE_POLICY=off` | Keep the built-in read/edit/write tools and don't guard bash |
-| `MYSTIQUE_CLOSE=1` | Close a herdr-spawned Neovim pane when the session ends |
-| `MYSTIQUE_REFOCUS=0` | Embedded mode: leave the cursor in the editor after each run |
-| `MYSTIQUE_AUTOSTART=0` | Don't open Neovim automatically when the interactive TUI starts |
-| `MYSTIQUE_KEYMAP_DENY=<vim regex>` | Override which mapping descriptions are left out of the cheat sheet |
+Mystique works day to day with pi and Claude Code. An [A/B evaluation](eval/RESULTS.md) against plain pi
+gives an honest picture so far:
+- **Semantic, multi-site changes win clearly.** A project-wide rename through the LSP used **18% fewer
+  tokens and 79% fewer tool calls**.
+- **Small single-file fixes cost more tokens.** The extra cost of the editor round-trips outweighs the
+  benefit there.
 
-> The old `PI_NVIM_*` names still work as aliases.
-
-## Tools
-
-The agent edits through these instead of the built-in file tools:
-
-`nvim_keys`, `nvim_ex`, `nvim_insert`, `nvim_view`, `nvim_grep`, `nvim_find`, `nvim_lsp`, `nvim_format`, `nvim_test`,
-`nvim_tests`, `nvim_check`, `nvim_screen`.
-
-While Mystique is active, the built-in `read`/`edit`/`write`/`grep`/`find`/`ls` tools are disabled, and bash
-commands that bypass the editor (`sed -i`, redirects, `cat file`, `rg`) are blocked. All buffers are saved
-before every allowed bash call.
-
-## How it works
-
-Mystique attaches to Neovim over msgpack-RPC (the official `neovim` npm client) and loads a small Lua helper
-(`core/lua/mystique.lua`) that exposes `_G.Mystique`: compact state snapshots, changed-line tracking, a
-human-activity guard, LSP helpers, capability discovery, format/test verbs and screen capture. Keystrokes go
-through `nvim_input`, the same path as real typing, so everything renders live.
-
-## Roadmap
-
-- Claude Code: installed via `node claude/install.mjs` and validated headless (playbook + capabilities injected, builtin file tools blocked inside Neovim, inert outside). Remaining: `/nvim*`-style controls.
-- Expand the [evaluation suite](eval/) (more multi-file tasks, cost reporting). First results: [eval/RESULTS.md](eval/RESULTS.md).
-
-## Demo
-
-`demo/` is a tiny TypeScript project with two type errors and a project-local language server;
-`demo-tests/` is a Jest project used to exercise the test-driven flow.
-`eval/` is the [evaluation harness](eval/README.md) that A/B-compares Mystique against plain pi (tokens, tool calls, success) on these fixtures.
-
-## Layout
-
-- `core/` — harness-agnostic engine (no pi SDK imports): the `NvimSession` RPC
-  driver, the `mystique.lua` helper, the `Snapshot` protocol, capability
-  rendering and the power-user playbook (`prompt.md`). Shared by the pi extension
-  and (planned) an MCP server for other agents.
-- `extension/` — the pi adapter: `defineTool` wrappers, TUI renderers, policy
-  guards and slash commands. Imports `../core`.
-- `mcp-nvim/` — an MCP server exposing the same `nvim_*` tools (backed by `core/`) for Claude Code and other MCP agents. See [mcp-nvim/README.md](mcp-nvim/README.md).
-- `claude/` — Claude Code hooks + settings + `CLAUDE.md` that pair with mcp-nvim to enforce editor-only editing. See [claude/README.md](claude/README.md).
-- `eval/` — the A/B evaluation harness. `demo/`, `demo-tests/` — fixtures.
+Next up: Claude Code equivalents of pi's `/nvim*` commands, and more eval tasks.
 
 ## Development
 
-```bash
-cd core && npm install && npm run check && npm test   # engine + its tests (needs nvim for the integration test)
-cd ../extension && npm install && npm run check        # pi adapter typecheck (resolves neovim via ../core)
+```
+core/       harness-agnostic engine: NvimSession (RPC), mystique.lua, snapshots, playbook
+extension/  pi adapter (tools, TUI renderers, guards, slash commands)
+mcp-nvim/   MCP server exposing the same tools to Claude Code and other MCP agents
+claude/     Claude Code hooks, installer and playbook
+bin/        the `mystique` CLI (install / doctor / update)
+eval/       A/B evaluation harness · demo/, demo-tests/: fixtures
 ```
 
-`core/nvim.test.ts` unit-tests the pure helpers (e.g. the capability manifest
-renderer); `core/nvim.integration.test.ts` spawns a real `nvim --listen` and drives
-it through `NvimSession` end to end (skips when `nvim` isn't on `PATH`). CI
-(`.github/workflows/ci.yml`) runs core, the extension typecheck, the `eval/`
-harness and the `demo-tests` Jest flow on every push and PR.
+```bash
+sh install.sh                                          # install your checkout in place
+cd core && npm install && npm run check && npm test   # engine (integration test needs nvim)
+cd ../mcp-nvim && npm install && npm test              # MCP server end to end against a headless nvim
+```
+
+CI runs every package's typecheck and tests, plus a fresh-install-and-doctor run, on each push.
+Details: [mcp-nvim/README.md](mcp-nvim/README.md), [claude/README.md](claude/README.md),
+[eval/README.md](eval/README.md).
+
+## License
+
+MIT
