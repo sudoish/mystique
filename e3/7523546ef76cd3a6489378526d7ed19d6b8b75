@@ -1,0 +1,14 @@
+README.md
+  h_8a472ace01776f 3-41,45-47,58,61-65,68,70-71,76,78-79,81,86-88,90-91,93-94,96,98-104,106,108-113,115,119-127,129-131,134-140
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.7.5",
+  "base_commit_sha": "e37523546ef76cd3a6489378526d7ed19d6b8b75",
+  "prompts": {},
+  "humans": {
+    "h_8a472ace01776f": {
+      "author": "Thiago Pacheco <hi@sudoish.com>"
+    }
+  }
+}
