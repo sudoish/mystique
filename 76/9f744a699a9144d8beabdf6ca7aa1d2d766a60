@@ -1,0 +1,26 @@
+claude/CLAUDE.md
+  h_8a472ace01776f 19
+core/lua/mystique.lua
+  h_8a472ace01776f 19,478-481,874-887,889-897,904-920,922-923,931,935,950,965-974,998-1021,1024
+core/prompt.md
+  h_8a472ace01776f 13
+core/tools.ts
+  h_8a472ace01776f 67,69,95,110-113,131,137-141
+extension/index.ts
+  h_8a472ace01776f 294
+mcp-nvim/index.test.ts
+  h_8a472ace01776f 128-135,140-141,220-244,258,264-275
+mcp-nvim/index.ts
+  h_8a472ace01776f 131
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.7.5",
+  "base_commit_sha": "769f744a699a9144d8beabdf6ca7aa1d2d766a60",
+  "prompts": {},
+  "humans": {
+    "h_8a472ace01776f": {
+      "author": "Thiago Pacheco <hi@sudoish.com>"
+    }
+  }
+}
