@@ -1,6 +1,27 @@
 import assert from "node:assert/strict";
 import { test } from "node:test";
+import { mkdtempSync, rmSync } from "node:fs";
+import { tmpdir } from "node:os";
+import { join } from "node:path";
 import { type Caps, renderCapabilities } from "./nvim.ts";
+import { detectMode } from "./detect.mjs";
+
+test("detectMode: socket and host beat the multiplexers; order is external, embedded, herdr, rex", () => {
+  const dir = mkdtempSync(join(tmpdir(), "mystique-detect-"));
+  try {
+    const sock = dir; // any existing path counts as a live socket
+    const mux = { HERDR_ENV: "1", REX_SESSION: "session:1", REX_BLOCK: "block:1" };
+    assert.equal(detectMode({ MYSTIQUE_SOCKET: sock, NVIM: sock, ...mux } as any), "external");
+    assert.equal(detectMode({ NVIM: sock, ...mux } as any), "embedded");
+    assert.equal(detectMode({ ...mux } as any), "herdr");
+    assert.equal(detectMode({ REX_SESSION: "session:1", REX_BLOCK: "block:1" } as any), "rex");
+    // Non-existent socket paths don't count.
+    assert.equal(detectMode({ MYSTIQUE_SOCKET: join(dir, "nope") } as any), undefined);
+    assert.equal(detectMode({} as any), undefined);
+  } finally {
+    rmSync(dir, { recursive: true, force: true });
+  }
+});
 
 test("renderCapabilities: full-featured config advertises the stable verbs", () => {
   const caps: Caps = {

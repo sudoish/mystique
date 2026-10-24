@@ -40,5 +40,5 @@ running tests. If a snapshot shows a `BLOCKING` prompt or an error, resolve it f
 (often `<Esc>`).
 
 Reaching the editor: the `nvim` MCP server connects to `MYSTIQUE_SOCKET` (an
-`nvim --listen` you started), `$NVIM` (Claude running in a Neovim terminal), or herdr.
+`nvim --listen` you started), `$NVIM` (Claude running in a Neovim terminal), or herdr or Rex.
 If the tools report "No Neovim to drive", start one and set `MYSTIQUE_SOCKET`.

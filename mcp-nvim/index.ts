@@ -3,7 +3,7 @@
  * so any MCP-capable agent (Claude Code, etc.) can drive a live, visible Neovim.
  *
  * It reaches Neovim exactly like the pi extension: embedded ($NVIM), external
- * (MYSTIQUE_SOCKET), or a herdr pane. With none reachable the tools return a clear
+ * (MYSTIQUE_SOCKET), or a herdr/Rex pane. With none reachable the tools return a clear
  * error instead of hanging.
  *
  *   claude mcp add nvim -- node --import tsx /path/to/mystique/mcp-nvim/index.ts
@@ -78,7 +78,7 @@ export function createServer(session: NvimSession, { tools: enabled = true } = {
     if (detectMode() === undefined) {
       return fail(
         "No Neovim to drive. Start `nvim --listen <sock>` and set MYSTIQUE_SOCKET=<sock>, run inside a Neovim " +
-        "terminal ($NVIM), or inside herdr.",
+        "terminal ($NVIM), or inside herdr or Rex.",
       );
     }
     try {

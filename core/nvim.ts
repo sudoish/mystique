@@ -1,27 +1,13 @@
-import { execFile } from "node:child_process";
 import { existsSync, readFileSync } from "node:fs";
 import { join } from "node:path";
 import { attach, type NeovimClient } from "neovim";
+import { multiplexer, type Multiplexer } from "./mux.ts";
 
 export type Speed = "demo" | "fast";
 
-/**
- * Where the Neovim we drive comes from:
- * - embedded: pi runs inside a `:terminal` of the user's Neovim (e.g. sidekick.nvim); `$NVIM` is its socket
- * - external: `MYSTIQUE_SOCKET` points at an `nvim --listen` the user started
- * - herdr: we split a herdr pane and spawn our own instance
- */
-export type Mode = "embedded" | "external" | "herdr";
-
-/** Which mode a connection would use from this process, or undefined when there is no Neovim to drive. */
-export function detectMode(): Mode | undefined {
-  const sock = process.env.MYSTIQUE_SOCKET;
-  if (sock && existsSync(sock)) return "external";
-  const host = process.env.NVIM;
-  if (host && existsSync(host)) return "embedded";
-  if (process.env.HERDR_ENV === "1") return "herdr";
-  return undefined;
-}
+import { detectMode, type Mode } from "./detect.mjs";
+export { detectMode };
+export type { Mode };
 
 // The neovim client defaults to a winston logger that monkey-patches `console`.
 // Pass a silent logger so pi's own output stays intact.
@@ -34,15 +20,6 @@ const silentLogger = {
 } as any;
 
 const sleep = (ms: number) => new Promise((r) => setTimeout(r, ms));
-
-function run(cmd: string, args: string[], timeoutMs = 15000): Promise<string> {
-  return new Promise((resolve, reject) => {
-    execFile(cmd, args, { timeout: timeoutMs, maxBuffer: 4 * 1024 * 1024 }, (err, stdout, stderr) => {
-      if (err) reject(new Error(`${cmd} ${args.join(" ")} failed: ${stderr || err.message}`));
-      else resolve(stdout);
-    });
-  });
-}
 
 export function shellQuote(s: string): string {
   return `'${s.replace(/'/g, `'\\''`)}'`;
@@ -132,6 +109,7 @@ export class NvimSession {
   socket: string | undefined;
   mode: Mode | undefined;
   paneId: string | undefined;
+  mux: Multiplexer | undefined;
   ownsPane = false;
   speed: Speed = (process.env.MYSTIQUE_SPEED as Speed) === "fast" ? "fast" : "demo";
   private chan = 0;
@@ -161,7 +139,7 @@ export class NvimSession {
 
   /** Short human-readable description of the connection, for notifications. */
   describe(): string {
-    if (this.mode === "herdr") return `herdr pane ${this.paneId}`;
+    if (this.mux && this.paneId) return this.mux.describe(this.paneId);
     if (this.mode === "embedded") return `inside the host Neovim (${this.socket})`;
     return `attached to ${this.socket}`;
   }
@@ -170,7 +148,7 @@ export class NvimSession {
     const mode = detectMode();
     if (!mode) {
       throw new Error(
-        "No Neovim to drive. Run pi inside a Neovim terminal (e.g. sidekick.nvim), inside herdr, " +
+        "No Neovim to drive. Run pi inside a Neovim terminal (e.g. sidekick.nvim), inside herdr or Rex, " +
         "or start `nvim --listen <sock>` yourself and set MYSTIQUE_SOCKET=<sock>.",
       );
     }
@@ -180,18 +158,12 @@ export class NvimSession {
     else if (mode === "embedded") socket = process.env.NVIM!;
     else {
       socket = `/tmp/pi-nvim-${process.pid}-${Date.now().toString(36)}.sock`;
-      const split = JSON.parse(
-        await run("herdr", ["pane", "split", "--current", "--direction", "right", "--cwd", cwd, "--no-focus"]),
-      );
-      const paneId: string = split?.result?.pane?.pane_id;
-      if (!paneId) throw new Error(`herdr pane split returned no pane id: ${JSON.stringify(split)}`);
-      this.paneId = paneId;
-      this.ownsPane = true;
+      const mux = multiplexer(mode)!;
+      this.mux = mux;
       // Make project-local language servers (node_modules/.bin) visible to nvim.
       const localBin = join(cwd, "node_modules", ".bin");
-      const prefix = existsSync(localBin) ? `PATH=${shellQuote(localBin)}:"$PATH" ` : "";
-      await run("herdr", ["pane", "run", paneId, `${prefix}nvim --listen ${shellQuote(socket)}`]);
-      await run("herdr", ["pane", "rename", paneId, "nvim (pi)"]).catch(() => { });
+      this.paneId = await mux.spawnEditor({ cwd, socket, localBin: existsSync(localBin) ? localBin : undefined });
+      this.ownsPane = true;
       const deadline = Date.now() + 20000;
       while (!existsSync(socket)) {
         if (Date.now() > deadline) throw new Error(`nvim did not create socket ${socket} within 20s`);
@@ -392,11 +364,11 @@ export class NvimSession {
       await Promise.race([this.client?.input(key), sleep(500)]).catch(() => { });
       await sleep(200);
     }
-    if (!this.ownsPane || !this.paneId) return;
-    // Belt and braces for our own herdr pane: real terminal keystrokes.
-    await run("herdr", ["pane", "send-keys", this.paneId, "enter"]).catch(() => { });
+    if (!this.mux || !this.ownsPane || !this.paneId) return;
+    // Belt and braces for our own herdr/Rex pane: real terminal keystrokes.
+    await this.mux.sendKey(this.paneId, "enter").catch(() => { });
     await sleep(200);
-    await run("herdr", ["pane", "send-keys", this.paneId, "esc"]).catch(() => { });
+    await this.mux.sendKey(this.paneId, "escape").catch(() => { });
     await sleep(200);
   }
 
@@ -409,29 +381,16 @@ export class NvimSession {
 
 
   /**
-   * Read what is visibly rendered in Neovim (for floating UIs and prompts). Our own herdr pane is read
-   * through herdr (works even while nvim is blocked); otherwise nvim renders its screen to text for us.
+   * Read what is visibly rendered in Neovim (for floating UIs and prompts). Our own herdr/Rex pane is
+   * read through the multiplexer (works even while nvim is blocked); otherwise nvim renders its screen
+   * to text for us.
    */
   async screen(lines = 60): Promise<string> {
-    if (!this.ownsPane || !this.paneId) {
+    if (!this.mux || !this.ownsPane || !this.paneId) {
       const text = await this.lua<string>("return Mystique.screen()", [], 10000);
       return text.split("\n").slice(-lines).join("\n");
     }
-    const out = await run("herdr", [
-      "pane",
-      "read",
-      this.paneId,
-      "--source",
-      "visible",
-      "--lines",
-      String(lines),
-    ]);
-    try {
-      const json = JSON.parse(out);
-      return json?.result?.read?.text ?? json?.result?.text ?? out;
-    } catch {
-      return out;
-    }
+    return this.mux.readScreen(this.paneId, lines);
   }
 
   async saveAll(): Promise<void> {
@@ -460,8 +419,8 @@ export class NvimSession {
       // Note: client.quit() sends `:qa!`. close() only detaches, leaving the editor open.
       await Promise.race([client.close().catch(() => { }), sleep(500)]);
     }
-    if (closePane && this.ownsPane && this.paneId) {
-      await run("herdr", ["pane", "close", this.paneId]).catch(() => { });
+    if (closePane && this.mux && this.ownsPane && this.paneId) {
+      await this.mux.close(this.paneId).catch(() => { });
       this.paneId = undefined;
     }
   }

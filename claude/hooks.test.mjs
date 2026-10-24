@@ -7,6 +7,29 @@ import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { buildContext } from "./hooks/nvim-context.mjs";
 import { addMystique, removeMystique } from "./install.mjs";
+import { nvimActive } from "./hooks/active.mjs";
+import { detectMode } from "../core/detect.mjs";
+
+test("detectMode: multiplexers, their precedence, and none", () => {
+  const base = { NVIM: undefined, MYSTIQUE_SOCKET: undefined, HERDR_ENV: undefined, REX_SESSION: undefined, REX_BLOCK: undefined };
+  const rex = { ...base, REX_SESSION: "session:1", REX_BLOCK: "block:1" };
+  const herdr = { ...base, HERDR_ENV: "1" };
+  // herdr inside Rex: HERDR_ENV wins because herdr is the inner multiplexer.
+  const herdrInRex = { ...base, HERDR_ENV: "1", REX_SESSION: "session:1", REX_BLOCK: "block:1" };
+
+  assert.equal(detectMode(rex), "rex");
+  assert.equal(detectMode(herdr), "herdr");
+  assert.equal(detectMode(herdrInRex), "herdr");
+  assert.equal(detectMode(base), undefined);
+  // Rex needs both session and block.
+  assert.equal(detectMode({ ...base, REX_SESSION: "session:1" }), undefined);
+  assert.equal(detectMode({ ...base, REX_BLOCK: "block:1" }), undefined);
+
+  assert.equal(nvimActive(rex), true);
+  assert.equal(nvimActive(herdr), true);
+  assert.equal(nvimActive(herdrInRex), true);
+  assert.equal(nvimActive(base), false);
+});
 
 test("blocks shell commands that bypass the editor", () => {
   const blocked = [
@@ -129,6 +152,8 @@ test("guards are inert outside Neovim", () => {
   delete env.NVIM;
   delete env.MYSTIQUE_SOCKET;
   delete env.HERDR_ENV;
+  delete env.REX_SESSION;
+  delete env.REX_BLOCK;
   const hook = (name, event) =>
     spawnSync("node", [new URL(`./hooks/${name}`, import.meta.url).pathname], {
       input: JSON.stringify(event),

@@ -30,8 +30,8 @@ then happens in a Neovim you can see, as motions, `:` commands and LSP actions, 
 
 1. **It connects to a Neovim.** It uses whichever it finds first: the editor the agent is running inside
    (a `:terminal`, detected via `$NVIM`), `MYSTIQUE_SOCKET=<sock>` for an `nvim --listen <sock>` you
-   started, or a new pane in [herdr](https://github.com/earendil-works/herdr). With none of these it stays
-   **inert** and your agent behaves exactly as before.
+   started, or a new pane in [herdr](https://github.com/earendil-works/herdr) or [Rex](https://rex.computer).
+   With none of these it stays **inert** and your agent behaves exactly as before.
 2. **It tells the agent about your editor.** The agent gets a short playbook, the backends your config
    provides (LSP, formatter, test runner, treesitter) and a cheat sheet of your keymaps.
 3. **It keeps edits inside the editor.** Builtin file tools are turned off (pi) or blocked by hooks
@@ -100,7 +100,7 @@ pass.
 | `MYSTIQUE_SPEED=fast` | Instant typing instead of paced (pi) |
 | `MYSTIQUE_AUTOSTART=0` | Don't connect when pi's TUI starts |
 | `MYSTIQUE_REFOCUS=0` | Leave the cursor in the editor after each run (embedded pi) |
-| `MYSTIQUE_CLOSE=1` | Close a herdr-spawned Neovim when the session ends |
+| `MYSTIQUE_CLOSE=1` | Close a herdr/Rex-spawned Neovim when the session ends |
 | `MYSTIQUE_KEYMAP_DENY=<regex>` | Which mappings to leave out of the keymap cheat sheet |
 
 ## Status

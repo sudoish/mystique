@@ -39,7 +39,7 @@ It installs `core/` + `mcp-nvim/` deps if missing, registers the `nvim` MCP serv
 the two PreToolUse guards, and `mcp__nvim` in `permissions.allow`.
 
 Then just run `claude` **inside a Neovim `:terminal`** (e.g. sidekick.nvim), or with
-`MYSTIQUE_SOCKET=<sock>` pointing at an `nvim --listen <sock>`, or in herdr — it drives
+`MYSTIQUE_SOCKET=<sock>` pointing at an `nvim --listen <sock>`, or in herdr or Rex — it drives
 that editor, gets the playbook + capabilities + keymaps injected, and the builtin file
 tools are blocked. **Anywhere else nothing changes**: the hooks are inert, the MCP
 server exposes no tools, and nothing is injected. `MYSTIQUE_POLICY=off` keeps the

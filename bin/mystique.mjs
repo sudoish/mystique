@@ -15,6 +15,7 @@ import { homedir } from "node:os";
 import { delimiter, dirname, isAbsolute, join, resolve } from "node:path";
 import { fileURLToPath, pathToFileURL } from "node:url";
 import { claudeSettingsFile, installClaude, SERVER, tsxPath } from "../claude/install.mjs";
+import { reachLabel } from "../core/detect.mjs";
 
 export const ROOT = real(join(dirname(fileURLToPath(import.meta.url)), ".."));
 const MIN = { node: [20, 0, 0], nvim: [0, 10, 0], nvimRecommended: [0, 11, 0] };
@@ -178,10 +179,8 @@ export function doctor(root = ROOT) {
     add("info", "claude code", "not installed (optional)");
   }
 
-  const reach = process.env.MYSTIQUE_SOCKET && existsSync(process.env.MYSTIQUE_SOCKET) ? `MYSTIQUE_SOCKET=${process.env.MYSTIQUE_SOCKET}`
-    : process.env.NVIM && existsSync(process.env.NVIM) ? "inside a Neovim terminal ($NVIM)"
-      : process.env.HERDR_ENV === "1" ? "herdr" : undefined;
-  add("info", "editor", reach ? `reachable now: ${reach}` : "no Neovim reachable from this shell — run your agent inside a Neovim :terminal, set MYSTIQUE_SOCKET, or use herdr");
+  const reach = reachLabel();
+  add("info", "editor", reach ? `reachable now: ${reach}` : "no Neovim reachable from this shell — run your agent inside a Neovim :terminal, set MYSTIQUE_SOCKET, or use herdr or Rex");
 
   return checks;
 }

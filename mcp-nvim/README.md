@@ -22,7 +22,7 @@ injects; the server's MCP `instructions` carry the last cached copy at startup.
 
 Like the extension, in priority order: **external** (`MYSTIQUE_SOCKET=<sock>` from an
 `nvim --listen <sock>` you started), **embedded** (`$NVIM`, i.e. pi/claude running in
-a Neovim `:terminal`), or **herdr**. With none reachable, every tool returns a clear
+a Neovim `:terminal`), or a **herdr**/**Rex** pane. With none reachable, every tool returns a clear
 error instead of hanging.
 
 ## Install & run

@@ -1,7 +1,7 @@
 /**
  * mystique — let any coding agent shapeshift into a Neovim power user and drive a live, visible editor.
  * The Neovim is either the one pi runs inside (a :terminal split, e.g. sidekick.nvim),
- * one the user points us at (MYSTIQUE_SOCKET), or one we spawn in a herdr pane.
+ * one the user points us at (MYSTIQUE_SOCKET), or one we spawn in a herdr or Rex pane.
  */
 import { readFileSync } from "node:fs";
 import { dirname, join } from "node:path";
@@ -26,7 +26,7 @@ const here = dirname(fileURLToPath(import.meta.url));
 const session = new NvimSession(join(here, "..", "core", "lua", "mystique.lua"));
 const playbook = readFileSync(join(here, "..", "core", "prompt.md"), "utf8");
 
-// Without a reachable Neovim (not inside one, not in herdr, no MYSTIQUE_SOCKET) the extension stays
+// Without a reachable Neovim (not inside one, not in herdr or Rex, no MYSTIQUE_SOCKET) the extension stays
 // inert: builtin tools and bash keep working, so a globally installed copy never cripples plain pi.
 const active = detectMode() !== undefined;
 const policyEnabled = active && process.env.MYSTIQUE_POLICY !== "off";
@@ -621,7 +621,7 @@ export default function(pi: ExtensionAPI) {
 
   pi.on("session_start", async (_event, ctx) => {
     if (!active && ctx.mode === "tui") {
-      ctx.ui.notify("mystique: no Neovim detected (run pi inside Neovim, herdr, or set MYSTIQUE_SOCKET); inactive", "warning");
+      ctx.ui.notify("mystique: no Neovim detected (run pi inside Neovim, herdr or Rex, or set MYSTIQUE_SOCKET); inactive", "warning");
     }
     if (policyEnabled) {
       pi.setActiveTools(pi.getActiveTools().filter((t) => !DISABLED_BUILTINS.includes(t)));
@@ -674,7 +674,7 @@ export default function(pi: ExtensionAPI) {
   });
 
   pi.registerCommand("nvim", {
-    description: "Connect to Neovim: the host editor, MYSTIQUE_SOCKET, or a new herdr pane",
+    description: "Connect to Neovim: the host editor, MYSTIQUE_SOCKET, or a new herdr/Rex pane",
     handler: async (_args, ctx) => {
       try {
         await start(ctx);
