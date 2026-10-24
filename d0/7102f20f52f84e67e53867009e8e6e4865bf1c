@@ -1,0 +1,52 @@
+bin/mystique.mjs
+  s_5a15aa30e355de::t_bf92ee06c01993 18,182-183
+README.md
+  s_5a15aa30e355de::t_6a7ae9c247a398 33,103
+  s_5a15aa30e355de::t_0035f5dccb2b78 34
+core/mux.ts
+  s_5a15aa30e355de::t_a4129beb7d07a9 1-138
+mcp-nvim/index.ts
+  s_5a15aa30e355de::t_0e61af6b778256 6
+  s_5a15aa30e355de::t_c46e33b8fcce6a 81
+claude/hooks.test.mjs
+  s_5a15aa30e355de::t_66beac062f3260 155-156
+  s_5a15aa30e355de::t_6a657a19b0aad3 10-32
+claude/hooks/active.mjs
+  s_5a15aa30e355de::t_654ba20117e1c2 2-5,8,10
+mcp-nvim/README.md
+  s_5a15aa30e355de::t_8db8ab16a307f6 25
+claude/CLAUDE.md
+  s_5a15aa30e355de::t_5b0b9b4047b612 43
+core/detect.mjs
+  s_5a15aa30e355de::t_115b7c8114a4c5 1-55
+core/nvim.test.ts
+  s_5a15aa30e355de::t_71853f81f0b050 3-5,7-24
+extension/index.ts
+  s_5a15aa30e355de::t_e7468a98bcd53e 4,29
+  s_5a15aa30e355de::t_e15fe44d689820 624,677
+core/detect.d.mts
+  s_5a15aa30e355de::t_409fb7f8f1aa16 1-5
+claude/README.md
+  s_5a15aa30e355de::t_b39789a957fd16 42
+core/nvim.ts
+  s_5a15aa30e355de::t_8689d80951d47d 4,8
+  s_5a15aa30e355de::t_9697995dde8799 112,142,151,161-162,165-166
+  s_5a15aa30e355de::t_8e90e12d2bcb21 9-10
+  s_5a15aa30e355de::t_bd24cee539e020 367-369,371,384-386,389,393,422-423
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.7.5",
+  "base_commit_sha": "d07102f20f52f84e67e53867009e8e6e4865bf1c",
+  "prompts": {},
+  "sessions": {
+    "s_5a15aa30e355de": {
+      "agent_id": {
+        "tool": "pi",
+        "id": "01a16bd7-4474-742c-b698-d7897070b9b9",
+        "model": "claude-opus-4-8"
+      },
+      "human_author": "Thiago Pacheco <hi@sudoish.com>"
+    }
+  }
+}
